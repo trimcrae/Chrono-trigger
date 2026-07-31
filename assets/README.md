@@ -62,19 +62,19 @@ slot positions, or edit them directly.
 
 ## packs/ — sheets built by the pipeline
 
-Instead of drawing a sheet by hand you can have one assembled from an upstream
-asset pack. `sources.json` lists the packs; `tools/sprite_pipeline.py` downloads
-the sheets, cuts the cells named in the slice map, and writes
-`packs/characters.png`, `packs/tiles.png` and `packs/prop-*.png` in exactly the
-layout described above.
+`packs/` holds sheets built by `tools/sprite_pipeline.py` from the packs listed
+in `sources.json`. A pack is one of two kinds:
 
-Building a pack and *using* it are separate steps. `"activate"` in `sources.json`
-is what points `manifest.json` at the generated sheets, and it ships **off**: a
-general-purpose pack is a downgrade next to art drawn for this game, so the
-sheets sit under `packs/` until someone asks for them. Flip it to `true`, rebuild,
-and the slots are filled in — only the ones the pipeline generates, so
-hand-written entries survive a rebuild, and `?noassets=1` still forces the drawn
-art either way.
+- **authored** — pixel art written by hand in this repository. The shipped one is
+  `tools/art/sprites.py`, which draws all eleven characters from a shared body
+  plus per-character hair, palettes and props. Edit the grids there and rebuild.
+- **fetched** — sheets downloaded from an openly licensed source, each pinned by
+  SHA-256, cut up according to a `[col, row]` slice map.
+
+`"activate"` in `sources.json` decides whether `manifest.json` points at the
+built sheets. Only the slots the pipeline generates are touched, so hand-written
+entries survive a rebuild, and `?noassets=1` still forces the art `js/pix.js`
+draws either way.
 
 ```sh
 python3 tools/sprite_pipeline.py discover --pack <id> --measure   # what's in an upstream pack
@@ -88,7 +88,7 @@ normally runs in CI: `.github/workflows/sprites.yml` rebuilds on every change to
 and commits the regenerated sheets. It can also be dispatched by hand to re-run
 discovery or rebuild a single pack.
 
-A pack entry names where the sheets live and which `[col, row]` cells map to
+A fetched pack names where the sheets live and which `[col, row]` cells map to
 which character direction, tile symbol or prop:
 
 ```json

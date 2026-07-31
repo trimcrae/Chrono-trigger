@@ -1,6 +1,6 @@
 {
   "characters": "packs/characters.png",
-  "tiles": "packs/tiles.png",
+  "tiles": null,
   "props": {},
   "characterOrder": [
     "crono",
@@ -14,15 +14,5 @@
     "kid",
     "guard",
     "cat"
-  ],
-  "tileOrder": [
-    ".",
-    ",",
-    "=",
-    "P",
-    "~",
-    "T",
-    "C",
-    "W"
   ]
 }
