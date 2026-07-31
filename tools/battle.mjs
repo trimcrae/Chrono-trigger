@@ -175,6 +175,66 @@ if (await startFight()) {
 }
 
 /* ------------------------------------------------------------------ */
+/* 1b. both techs — Cyclone damages, Aura heals, and they differ       */
+/* ------------------------------------------------------------------ */
+if (await startFight()) {
+  for (const idx of [0, 1]) {
+    // Force this member's gauge so the menu belongs to them; otherwise whoever
+    // fills first decides which branch gets exercised.
+    const who = await h.page.evaluate(i => {
+      const b = window.__CT.battle;
+      if (!b.party[i]) return null;
+      b.menu = null;
+      b.party.forEach((p, n) => { p.atb = n === i ? 1 : 0; p.mp = p.maxmp || 12; });
+      b.party.forEach(p => { p.hp = Math.max(1, Math.round(p.maxhp * 0.4)); });
+      return { name: b.party[i].name, tech: b.party[i].tech.name, heals: !!b.party[i].tech.heal };
+    }, idx);
+    if (!who) continue;
+
+    const before = await battle();
+    if (!(await chooseCommand('Tech'))) continue;
+    const acting = (await battle()).menu;
+    if (!acting || acting.member !== who.name) {
+      h.note(`skipped ${who.name}'s tech: ${acting && acting.member} got the turn instead`);
+      await h.press('KeyX');
+      continue;
+    }
+    await cursorTo(0, `use ${who.tech}`);
+    await h.press('KeyZ');
+    await h.wait(1800);
+    const after = await battle();
+    if (!after) continue;
+
+    if (who.heals) {
+      const bHp = before.party.reduce((a, p) => Math.min(a, p.hp), 999);
+      const aHp = after.party.reduce((a, p) => Math.min(a, p.hp), 999);
+      if (aHp <= bHp) h.fail(`BATTLE: ${who.tech} healed nobody (lowest HP ${bHp} -> ${aHp})`);
+      else { h.cover(`battle: ${who.tech} heals the party`); h.note(`${who.tech}: lowest HP ${bHp} -> ${aHp}`); }
+    } else {
+      if (after.enemyHp >= before.enemyHp) h.fail(`BATTLE: ${who.tech} did not damage Gato`);
+      else { h.cover(`battle: ${who.tech} damages the enemy`); h.note(`${who.tech}: Gato ${before.enemyHp} -> ${after.enemyHp}`); }
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 1c. the rematch pays less than the first win                        */
+/* ------------------------------------------------------------------ */
+if (await startFight(['metMarle', 'marleJoined', 'gatoBeaten'])) {
+  await h.page.evaluate(() => { window.__CT.battle.enemy.hp = 4; });
+  for (let i = 0; i < 40; i++) {
+    const b = await battle();
+    if (!b || b.state !== 'fight') break;
+    if (b.menu) await chooseCommand('Attack');
+    else await h.wait(300);
+  }
+  await h.waitFor(s => s.scene === 'field', 'the rematch did not hand back to the field', 20000);
+  const paid = await h.settle();
+  if (paid.silver !== 5) h.fail(`BATTLE: a rematch paid ${paid.silver} silver, expected 5`);
+  else { h.cover('battle: a rematch pays 5 silver, not 15'); h.note(`rematch paid ${paid.silver}`); }
+}
+
+/* ------------------------------------------------------------------ */
 /* 2. losing — the branch a normal playthrough never sees              */
 /* ------------------------------------------------------------------ */
 if (await startFight()) {
