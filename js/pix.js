@@ -31,194 +31,279 @@ const px = (x, y, w, h, col, g) => { g.fillStyle = col; g.fillRect(x, y, w, h); 
 // Frame layout: 16 wide x 24 tall. Feet rest on y=23.
 // dirs: down, up, left, right. frames: 0..3 (0/2 = stand, 1 = left step, 3 = right step)
 
+/* ---------- palette helpers: every tone is derived from one base colour ---------- */
+const _hx = c => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
+const _rgb = (r, g, b) => '#' + [r, g, b]
+  .map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+export function mix(a, b, t) {
+  const A = _hx(a), B = _hx(b);
+  return _rgb(A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t);
+}
+export const dk = (c, t = 0.3) => mix(c, '#170f1a', t);
+export const lt = (c, t = 0.25) => mix(c, '#fffdf2', t);
+
+// SNES-era sprites outline in a dark tint of the material, not pure black.
+const OUT = '#2b1d26';
+
 export const CHARS = {
   crono: {
-    skin: '#f0c090', skinDark: '#c08858',
-    hair: '#e85018', hairDark: '#a02808', hairStyle: 'spiky',
-    shirt: '#f0f0f0', shirtDark: '#b0b8c8',
-    pants: '#3060c0', pantsDark: '#204088',
-    shoes: '#c0a020', band: '#ffffff', sword: true,
+    skin: '#f6cb9c', hair: '#f0571c', top: '#2f6f96', bottom: '#efe9d8',
+    shoes: '#8a5a2c', style: 'spiky', band: '#f4f2ec', sash: '#d8b23a', sword: true,
   },
   marle: {
-    skin: '#f8d0a0', skinDark: '#d09858',
-    hair: '#f8e058', hairDark: '#c8a020', hairStyle: 'ponytail',
-    shirt: '#f8f8f8', shirtDark: '#c0c8d8',
-    pants: '#f8f8f8', pantsDark: '#c0c8d8',
-    shoes: '#20a060', accent: '#20a060', pendant: true,
+    skin: '#fad7a8', hair: '#f5d95e', top: '#f2f0e6', bottom: '#cdb782',
+    shoes: '#7a4a28', style: 'ponytail', trim: '#2fa46a', pendant: true,
   },
   lucca: {
-    skin: '#f8d0a0', skinDark: '#d09858',
-    hair: '#9048c0', hairDark: '#602888', hairStyle: 'helmet',
-    shirt: '#e8b048', shirtDark: '#b07820',
-    pants: '#804828', pantsDark: '#583018',
-    shoes: '#503020', glasses: true, helmet: '#e07030',
+    skin: '#fad7a8', hair: '#8b46bd', top: '#e9b652', bottom: '#8a5330',
+    shoes: '#5a3520', style: 'helmet', helmet: '#e3702e', glasses: true,
   },
   mom: {
-    skin: '#f8d0a0', skinDark: '#d09858',
-    hair: '#b05828', hairDark: '#803818', hairStyle: 'bob',
-    shirt: '#d05070', shirtDark: '#a03050',
-    pants: '#d05070', pantsDark: '#a03050',
-    shoes: '#804020',
+    skin: '#fad7a8', hair: '#b3592b', top: '#c9527a', bottom: '#a33f60',
+    shoes: '#7a4426', style: 'bob',
   },
   taban: {
-    skin: '#e8b880', skinDark: '#b88850',
-    hair: '#403030', hairDark: '#282020', hairStyle: 'bald',
-    shirt: '#3878b8', shirtDark: '#204888',
-    pants: '#585868', pantsDark: '#383848',
-    shoes: '#302828', beard: '#f0f0f0', big: true,
+    skin: '#e9b981', hair: '#3d3130', top: '#3b7ab8', bottom: '#5b5b6a',
+    shoes: '#332a28', style: 'bald', beard: '#f0efe8', big: true,
   },
   villager1: {
-    skin: '#f0c090', skinDark: '#c08858',
-    hair: '#503020', hairDark: '#302010', hairStyle: 'bob',
-    shirt: '#50a850', shirtDark: '#307030',
-    pants: '#605040', pantsDark: '#403020', shoes: '#402818',
+    skin: '#f1c496', hair: '#54331f', top: '#4fa356', bottom: '#63523f',
+    shoes: '#40291a', style: 'bob',
   },
   villager2: {
-    skin: '#e8c8a8', skinDark: '#b89878',
-    hair: '#f0d060', hairDark: '#c0a030', hairStyle: 'bob',
-    shirt: '#b060c0', shirtDark: '#803890',
-    pants: '#b060c0', pantsDark: '#803890', shoes: '#503020',
+    skin: '#e9cbaa', hair: '#efd268', top: '#a95fc0', bottom: '#7c3f8e',
+    shoes: '#523322', style: 'bob',
   },
   villager3: {
-    skin: '#d8a878', skinDark: '#a87848',
-    hair: '#202028', hairDark: '#101018', hairStyle: 'spiky',
-    shirt: '#d8a840', shirtDark: '#a87820',
-    pants: '#4058a0', pantsDark: '#283878', shoes: '#302020',
+    skin: '#d9a97a', hair: '#232228', top: '#d8a63f', bottom: '#3f5aa0',
+    shoes: '#31221f', style: 'spiky',
   },
   kid: {
-    skin: '#f8d0a0', skinDark: '#d09858',
-    hair: '#a04828', hairDark: '#702810', hairStyle: 'bob',
-    shirt: '#e05040', shirtDark: '#a83028',
-    pants: '#4878c8', pantsDark: '#2850a0', shoes: '#403028', small: true,
+    skin: '#fad7a8', hair: '#a54a29', top: '#e0503f', bottom: '#4a79c8',
+    shoes: '#3f3028', style: 'bob', small: true,
   },
   guard: {
-    skin: '#e8c090', skinDark: '#b89058',
-    hair: '#606878', hairDark: '#404858', hairStyle: 'helm',
-    shirt: '#8890a0', shirtDark: '#606878',
-    pants: '#484858', pantsDark: '#303040', shoes: '#282830',
+    skin: '#e9c191', hair: '#6a7280', top: '#8a93a3', bottom: '#4a4a58',
+    shoes: '#2b2b32', style: 'helm',
   },
   cat: { cat: true },
 };
 
+/* ------------------------------------------------------------------ *
+ * Field sprite: 16x24, feet planted on y=23.
+ * Proportions follow the SNES look — a big head roughly a third of the
+ * body, a short torso, an outline in a dark tint, one light source from
+ * the upper left, and a four frame walk cycle with a one pixel body bob.
+ * ------------------------------------------------------------------ */
 function drawHuman(g, c, dir, frame) {
-  const step = (frame === 1) ? 1 : (frame === 3 ? -1 : 0);
-  const yo = c.small ? 4 : (c.big ? -1 : 0); // vertical body offset (kids are short)
-  const H = (v) => v + yo;
-
-  const back = dir === 'up', side = dir === 'left' || dir === 'right';
+  const back = dir === 'up';
+  const side = dir === 'left' || dir === 'right';
   const flip = dir === 'left';
+  const step = frame === 1 ? 1 : frame === 3 ? -1 : 0;   // which foot leads
+  const bob = step ? 1 : 0;                              // body lifts mid-stride
+
+  const skin = c.skin, skinD = dk(skin, 0.2), skinL = lt(skin, 0.16);
+  const hair = c.hair, hairD = dk(hair, 0.34), hairL = lt(hair, 0.3);
+  const top = c.top, topD = dk(top, 0.28), topL = lt(top, 0.16);
+  const bot = c.bottom, botD = dk(bot, 0.28);
+  const shoe = c.shoes, shoeD = dk(shoe, 0.28);
 
   g.save();
   if (flip) { g.translate(16, 0); g.scale(-1, 1); }
 
-  // shadow
-  g.globalAlpha = 0.25;
-  px(4, 22, 8, 2, '#000000', g);
+  // outlined block: silhouette first, fill inset by a pixel, shade down the right
+  const shp = (x, y, w, h, fill, shade) => {
+    if (h <= 0) return;
+    px(x, y, w, h, OUT, g);
+    if (w > 2 && h > 2) {
+      px(x + 1, y + 1, w - 2, h - 2, fill, g);
+      if (shade) px(x + w - 2, y + 1, 1, h - 2, shade, g);
+    }
+  };
+
+  /* --- vertical layout ---------------------------------------------
+     0..3   hair spikes / helmet plume
+     hy..   head, 10 tall
+     12..17 torso        18..20 legs        20..23 shoes
+     ------------------------------------------------------------------ */
+  const drop = c.small ? 3 : c.big ? -1 : 0;
+  const Y = v => v + drop - bob;          // head/torso/arms ride the bob
+  const G = v => v + drop;                // feet stay planted
+  const hy = c.style === 'spiky' ? 4 : c.style === 'helm' ? 3 : 2;
+
+  // ground shadow
+  g.globalAlpha = 0.22;
+  px(4, G(21), 8, 2, '#000000', g);
+  px(3, G(22), 10, 1, '#000000', g);
   g.globalAlpha = 1;
 
-  // --- legs ---
-  const legTop = H(18), legBot = 22;
-  const l1 = step === 1 ? 1 : 0, l2 = step === -1 ? 1 : 0;
-  px(5, legTop + l1, 3, legBot - legTop - l1, c.pants, g);
-  px(8, legTop + l2, 3, legBot - legTop - l2, c.pantsDark, g);
-  px(5, 22 - (side ? 0 : 0), 3, 2, c.shoes, g);
-  px(8, 22, 3, 2, c.shoes, g);
-  if (side) { // one leg forward when viewed from the side
-    px(6, legTop, 5, legBot - legTop, c.pants, g);
-    px(6 + step, 22, 5, 2, c.shoes, g);
+  /* ---- legs: one block with a stride gap, so they read at 16px ---- */
+  const hip = Y(17), sole = G(21);
+  const legW = side ? 6 : 8, legX = side ? 5 : 4;
+  shp(legX, hip, legW, sole - hip + 1, bot, botD);
+  if (!side) {
+    // stride gap slides left/right with the step
+    px(7 + step, hip + 1, 2, sole - hip - 1, OUT, g);
+  }
+  // shoes
+  if (side) {
+    shp(4 + step * 2, G(20), 7, 3, shoe, shoeD);
+    shp(4 - step, G(20), 5, 3, dk(shoe, 0.15), shoeD);
+  } else {
+    shp(3, G(20) - (step > 0 ? 1 : 0), 5, 3, shoe, shoeD);
+    shp(8, G(20) - (step < 0 ? 1 : 0), 5, 3, shoe, shoeD);
   }
 
-  // --- torso ---
-  px(4, H(12), 8, H(19) - H(12), c.shirt, g);
-  px(4, H(12), 8, 1, c.shirtDark, g);
-  px(4, H(18), 8, 1, c.shirtDark, g);
-  if (c.accent) px(4, H(13), 8, 1, c.accent, g);
-  if (side) { px(4, H(12), 8, H(19) - H(12), c.shirt, g); px(10, H(12), 2, H(19) - H(12), c.shirtDark, g); }
+  /* ---- far arm (behind the body on side views) ---- */
+  const armY = Y(11), swing = step;
+  if (side) shp(6, armY + 1 - swing, 3, 6, topD, dk(top, 0.45));
 
-  // --- arms ---
-  const swing = step;
-  px(3, H(12) + Math.max(0, swing), 2, 5, c.shirtDark, g);
-  px(11, H(12) - Math.min(0, swing), 2, 5, c.shirtDark, g);
-  px(3, H(17) + Math.max(0, swing), 2, 2, c.skin, g);
-  px(11, H(17) - Math.min(0, swing), 2, 2, c.skin, g);
+  /* ---- torso ---- */
+  if (side) shp(5, Y(11), 6, 7, top, topD);
+  else {
+    shp(3, Y(11), 10, 7, top, topD);
+    px(3, Y(11), 1, 1, OUT, g); px(12, Y(11), 1, 1, OUT, g);   // rounded shoulders
+    px(4, Y(12), 3, 1, topL, g);
+  }
+  if (c.trim) {
+    px(side ? 6 : 4, Y(12), side ? 4 : 8, 1, c.trim, g);
+    if (!side && !back) px(7, Y(13), 2, 4, c.trim, g);
+  }
+  if (c.sash) px(side ? 6 : 4, Y(15), side ? 5 : 8, 2, c.sash, g);
 
-  // --- head ---
-  px(4, H(5), 8, 7, c.skin, g);
-  px(4, H(11), 8, 1, c.skinDark, g);
-  px(3, H(7), 1, 3, c.skin, g);
-  px(12, H(7), 1, 3, c.skin, g);
+  /* ---- near arms ---- */
+  if (side) {
+    shp(7, armY + 1 + swing, 3, 6, top, topD);
+    px(8, armY + 6 + swing, 2, 2, skin, g);
+  } else {
+    shp(1, armY + Math.max(0, swing), 3, 7, top, topD);
+    shp(12, armY - Math.min(0, swing), 3, 7, top, topD);
+    px(2, armY + 5 + Math.max(0, swing), 2, 2, skin, g);
+    px(13, armY + 5 - Math.min(0, swing), 2, 2, skin, g);
+  }
 
-  // face
+  /* ---- long hair that hangs behind the head ---- */
+  if (c.style === 'ponytail' && !back) {
+    const tx = side ? 1 : 12;
+    px(tx, Y(hy + 2), 3, 11, hair, g);
+    px(tx, Y(hy + 2), 1, 11, hairL, g);
+    px(tx + 2, Y(hy + 2), 1, 11, hairD, g);
+    px(tx, Y(hy + 12), 3, 2, hairD, g);
+  }
+
+  /* ---- head ---- */
+  const hw = side ? 9 : 10, hx0 = side ? 3 : 3;
+  shp(hx0, Y(hy), hw, 10, skin, skinD);
+  px(hx0, Y(hy), 1, 1, OUT, g); px(hx0 + hw - 1, Y(hy), 1, 1, OUT, g);
+  px(hx0 + 1, Y(hy + 1), 2, 1, skinL, g);
+
+  /* ---- face ---- */
   if (!back) {
+    const ey = Y(hy + 5);
     if (side) {
-      px(9, H(8), 1, 2, '#302020', g);
-      px(10, H(10), 2, 1, c.skinDark, g);
+      px(8, ey, 2, 3, OUT, g);
+      px(8, ey, 1, 2, '#ffffff', g);
+      px(9, ey + 3, 2, 1, skinD, g);
     } else {
-      px(6, H(8), 1, 2, '#302020', g);
-      px(9, H(8), 1, 2, '#302020', g);
-      px(7, H(10), 2, 1, c.skinDark, g);
+      px(5, ey, 2, 3, OUT, g); px(9, ey, 2, 3, OUT, g);
+      px(5, ey, 1, 2, '#ffffff', g); px(9, ey, 1, 2, '#ffffff', g);
+      px(7, ey + 3, 2, 1, skinD, g);
     }
   }
   if (c.glasses && !back) {
-    px(side ? 8 : 5, H(8), side ? 4 : 6, 2, '#d8e8f8', g);
-    px(side ? 8 : 5, H(7), side ? 4 : 6, 1, '#404858', g);
+    const ey = Y(hy + 4);
+    px(side ? 7 : 4, ey, side ? 5 : 8, 4, dk('#7fd0ee', 0.6), g);
+    px(side ? 8 : 5, ey + 1, side ? 3 : 2, 2, '#d6eefb', g);
+    if (!side) px(9, ey + 1, 2, 2, '#d6eefb', g);
   }
-  if (c.beard && !back) px(5, H(10), 6, 2, c.beard, g);
+  if (c.beard && !back) {
+    px(4, Y(hy + 7), 8, 3, c.beard, g);
+    px(4, Y(hy + 7), 8, 1, dk(c.beard, 0.18), g);
+  }
 
-  // --- hair ---
-  const hs = c.hairStyle;
-  if (hs === 'spiky') {
-    px(3, H(3), 10, 4, c.hair, g);
-    px(2, H(5), 1, 3, c.hairDark, g);
-    px(13, H(5), 1, 3, c.hairDark, g);
-    // spikes
-    for (const [x, h] of [[2, 3], [4, 5], [6, 6], [8, 5], [10, 4], [12, 3]]) {
-      px(x, H(3) - h, 2, h, c.hair, g);
-      px(x, H(3) - h, 1, h, c.hairDark, g);
+  /* ---- hair ---- */
+  const style = c.style;
+  if (style === 'spiky') {
+    px(3, Y(hy), 10, 3, hair, g);
+    px(4, Y(hy + 1), 4, 1, hairL, g);
+    px(3, Y(hy + 2), 10, 1, hairD, g);
+    const spikes = side ? [[3, 3], [5, 4], [7, 4], [9, 3], [11, 2]]
+      : [[2, 3], [4, 4], [6, 4], [8, 4], [10, 3], [12, 2]];
+    for (const [x, h] of spikes) {
+      px(x, Y(hy) - h, 2, h + 1, hair, g);
+      px(x, Y(hy) - h, 1, h, hairL, g);
+      px(x + 1, Y(hy) - h, 1, 1, hairD, g);
     }
-    if (c.band) { px(3, H(6), 10, 2, c.band, g); px(3, H(7), 10, 1, '#c0c8d0', g); }
-  } else if (hs === 'ponytail') {
-    px(3, H(3), 10, 4, c.hair, g);
-    px(3, H(2), 10, 1, c.hairDark, g);
-    px(3, H(6), 2, 4, c.hair, g);
-    px(11, H(6), 2, 4, c.hair, g);
-    // tail behind
-    if (back) { px(6, H(6), 4, 12, c.hair, g); px(6, H(6), 1, 12, c.hairDark, g); }
-    else if (side) { px(1, H(5), 3, 10, c.hair, g); px(1, H(5), 1, 10, c.hairDark, g); }
-    else { px(12, H(5), 3, 9, c.hair, g); px(1, H(5), 3, 9, c.hair, g); }
-    if (c.pendant && !back) px(7, H(13), 2, 2, '#f8f070', g);
-  } else if (hs === 'helmet') {
-    px(3, H(2), 10, 5, c.hair, g);
-    px(2, H(4), 12, 4, c.helmet || c.hair, g);
-    px(2, H(4), 12, 1, '#f8a860', g);
-    px(2, H(7), 12, 1, '#a04818', g);
-    if (!back) { px(4, H(8), 2, 2, c.hairDark, g); px(10, H(8), 2, 2, c.hairDark, g); }
-  } else if (hs === 'bob') {
-    px(3, H(3), 10, 5, c.hair, g);
-    px(3, H(2), 10, 1, c.hairDark, g);
-    px(2, H(5), 2, 6, c.hair, g);
-    px(12, H(5), 2, 6, c.hair, g);
-    if (back) px(3, H(3), 10, 9, c.hair, g);
-  } else if (hs === 'bald') {
-    px(4, H(4), 8, 3, c.skin, g);
-    px(3, H(6), 2, 3, c.hair, g);
-    px(11, H(6), 2, 3, c.hair, g);
-    px(4, H(4), 8, 1, c.skinDark, g);
-  } else if (hs === 'helm') {
-    px(3, H(2), 10, 6, c.hair, g);
-    px(3, H(2), 10, 1, '#a8b0c0', g);
-    px(6, H(0), 4, 3, '#c04040', g);
-    px(3, H(7), 10, 1, c.hairDark, g);
+    px(2, Y(hy + 1), 1, 3, hairD, g);
+    px(13, Y(hy + 1), 1, 3, hairD, g);
+    if (c.band) {
+      px(3, Y(hy + 3), 10, 2, c.band, g);
+      px(3, Y(hy + 4), 10, 1, dk(c.band, 0.2), g);
+      px(12, Y(hy + 3), 2, 6, c.band, g);                 // trailing tie
+      px(13, Y(hy + 5), 1, 4, dk(c.band, 0.2), g);
+    }
+    if (back) { px(3, Y(hy), 10, 5, hair, g); px(3, Y(hy + 4), 10, 1, hairD, g); }
+  } else if (style === 'ponytail') {
+    px(3, Y(hy - 1), 10, 4, hair, g);
+    px(3, Y(hy - 1), 10, 1, hairD, g);
+    px(4, Y(hy), 4, 1, hairL, g);
+    px(2, Y(hy + 1), 2, 4, hair, g);
+    px(12, Y(hy + 1), 2, 4, hair, g);
+    px(13, Y(hy + 1), 1, 4, hairD, g);
+    if (back) {
+      px(3, Y(hy), 10, 8, hair, g);
+      px(6, Y(hy + 6), 4, 10, hair, g);
+      px(6, Y(hy + 6), 1, 10, hairL, g);
+      px(9, Y(hy + 6), 1, 10, hairD, g);
+      px(6, Y(hy + 15), 4, 2, hairD, g);
+    }
+    if (c.pendant && !back) {
+      px(7, Y(13), 2, 2, '#f7e37a', g);
+      px(7, Y(13), 1, 1, '#fff8c8', g);
+    }
+  } else if (style === 'helmet') {
+    px(3, Y(hy - 1), 10, 3, hair, g);                     // hair above the rim
+    px(2, Y(hy + 6), 3, 4, hair, g);                      // hair below the rim
+    px(11, Y(hy + 6), 3, 4, hair, g);
+    shp(2, Y(hy - 2), 12, 6, c.helmet || hair, dk(c.helmet || hair, 0.3));
+    px(3, Y(hy - 1), 8, 1, lt(c.helmet || hair, 0.4), g);
+    px(2, Y(hy + 3), 12, 1, dk(c.helmet || hair, 0.5), g);
+    px(1, Y(hy), 1, 3, dk(c.helmet || hair, 0.35), g);
+    px(14, Y(hy), 1, 3, dk(c.helmet || hair, 0.35), g);
+  } else if (style === 'bob') {
+    px(3, Y(hy - 1), 10, 4, hair, g);
+    px(3, Y(hy - 1), 10, 1, hairD, g);
+    px(4, Y(hy), 4, 1, hairL, g);
+    px(2, Y(hy + 1), 2, 7, hair, g);
+    px(12, Y(hy + 1), 2, 7, hair, g);
+    px(13, Y(hy + 1), 1, 7, hairD, g);
+    if (back) { px(3, Y(hy), 10, 9, hair, g); px(4, Y(hy + 1), 3, 7, hairL, g); }
+  } else if (style === 'bald') {
+    px(4, Y(hy), 8, 2, skinL, g);
+    px(2, Y(hy + 2), 2, 4, hair, g);
+    px(12, Y(hy + 2), 2, 4, hair, g);
+  } else if (style === 'helm') {
+    shp(2, Y(hy - 2), 12, 7, c.hair, dk(c.hair, 0.3));
+    px(3, Y(hy - 1), 9, 1, lt(c.hair, 0.45), g);
+    px(6, Y(hy - 5), 4, 4, '#b8433b', g);                 // plume
+    px(6, Y(hy - 5), 2, 4, '#d8615a', g);
+    if (!back) px(4, Y(hy + 3), 8, 2, dk(c.hair, 0.55), g);
   }
 
-  // sword on the back
-  if (c.sword && !side) {
-    px(11, H(9), 2, 9, '#c8d0d8', g);
-    px(11, H(9), 1, 9, '#8890a0', g);
-    px(10, H(17), 4, 2, '#806030', g);
-  } else if (c.sword) {
-    px(3, H(10), 2, 8, '#c8d0d8', g);
-    px(2, H(17), 4, 2, '#806030', g);
+  /* ---- Crono's katana rides on his back ---- */
+  if (c.sword) {
+    if (back) {
+      px(4, Y(11), 2, 9, '#c9d2da', g);
+      px(4, Y(11), 1, 9, '#8f99a6', g);
+      px(3, Y(10), 4, 2, '#7b5326', g);
+      px(3, Y(19), 4, 2, '#7b5326', g);
+    } else if (side) {
+      px(3, Y(11), 2, 8, '#8f99a6', g);
+      px(2, Y(10), 4, 2, '#7b5326', g);
+    } else {
+      px(12, Y(hy + 6), 2, 5, '#8f99a6', g);              // hilt over the shoulder
+      px(11, Y(hy + 9), 4, 2, '#7b5326', g);
+    }
   }
 
   g.restore();
@@ -226,19 +311,44 @@ function drawHuman(g, c, dir, frame) {
 
 function drawCat(g, dir, frame) {
   const step = frame === 1 ? 1 : frame === 3 ? -1 : 0;
-  const body = '#e8b848', dark = '#b88820';
-  px(4, 16, 8, 5, body, g);
-  px(4, 20, 8, 1, dark, g);
-  px(4, 21, 2, 2, dark, g);
-  px(10, 21, 2, 2, dark, g);
-  px(3, 14, 6, 5, body, g);          // head
-  px(3, 12, 2, 2, body, g);          // ears
-  px(7, 12, 2, 2, body, g);
-  if (dir !== 'up') { px(4, 15, 1, 1, '#204020', g); px(7, 15, 1, 1, '#204020', g); }
-  px(11, 13 + step, 2, 5, body, g);  // tail
+  const body = '#e2a83e', bodyD = dk(body, 0.3), bodyL = lt(body, 0.25);
+  g.globalAlpha = 0.22; px(4, 21, 8, 2, '#000000', g); g.globalAlpha = 1;
+  // body
+  px(3, 14, 10, 8, OUT, g);
+  px(4, 15, 8, 6, body, g);
+  px(10, 15, 1, 6, bodyD, g);
+  px(5, 15, 3, 2, bodyL, g);
+  px(4, 21, 2, 2, OUT, g); px(10, 21, 2, 2, OUT, g);
+  // head
+  px(2, 10, 8, 7, OUT, g);
+  px(3, 11, 6, 5, body, g);
+  px(8, 11, 1, 5, bodyD, g);
+  px(2, 8, 3, 3, OUT, g); px(7, 8, 3, 3, OUT, g);
+  px(3, 9, 1, 2, '#f0b9a8', g); px(8, 9, 1, 2, '#f0b9a8', g);
+  if (dir !== 'up') {
+    px(4, 12, 1, 2, '#26351f', g); px(7, 12, 1, 2, '#26351f', g);
+    px(5, 14, 2, 1, '#c9764f', g);
+  }
+  // tail
+  px(12, 12 + step, 2, 6, OUT, g);
+  px(12, 13 + step, 1, 4, body, g);
 }
 
+/* ------------------------------------------------------------------ *
+ * Optional art override.
+ * Every drawing routine below is a fallback. If a sprite sheet has been
+ * supplied (see js/assets.js and assets/README.md) its frames are pushed
+ * into these caches at boot and used verbatim instead.
+ * ------------------------------------------------------------------ */
+export const CHAR_ORDER = Object.keys(CHARS);
+export const DIRS = ['down', 'up', 'left', 'right'];
+export const FRAME_W = 16, FRAME_H = 24, FRAMES = 4;
+
 const charCache = new Map();
+export function primeChar(name, dir, frame, canvas) { charCache.set(name + dir + frame, canvas); }
+export function primeTile(ch, canvas) { for (let i = 0; i < 8; i++) tileCache.set(ch + ':' + i, canvas); }
+export function primeProp(name, canvas) { propCache.set(name, canvas); }
+
 export function charFrame(name, dir, frame) {
   const key = name + dir + frame;
   let f = charCache.get(key);
@@ -255,6 +365,7 @@ export function charFrame(name, dir, frame) {
 /* ------------------------------------------------------------------ */
 
 const tileCache = new Map();
+const propCache = new Map();
 
 const TILE_DRAW = {
   // --- outdoor ---
@@ -473,6 +584,8 @@ const TILE_DRAW = {
 
 export const SOLID = new Set(['#', 'T', '~', 'C', 'W', 'S', 'H', 'R', 'w', 'B', 't', 'g', 'k', 'p', 'b', 'q', 'e', 'E', 'c', 'L', 'M', 'x']);
 
+export const TILE_ORDER = Object.keys(TILE_DRAW);
+
 export function tileCanvas(ch, seedIndex) {
   const key = ch + ':' + (seedIndex % 8);
   let t = tileCache.get(key);
@@ -488,7 +601,7 @@ export function tileCanvas(ch, seedIndex) {
 /* PROPS (multi-tile objects drawn on top of the tile layer)           */
 /* ------------------------------------------------------------------ */
 
-const propCache = new Map();
+export const PROP_NAMES = ['bell', 'gato', 'gate', 'balloon'];
 
 export function prop(name) {
   let p = propCache.get(name);

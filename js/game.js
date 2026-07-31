@@ -6,6 +6,7 @@ import { initInput, keys, tap, clearTaps, onFirstInput } from './input.js';
 import { Dialogue, drawBanner, VW, VH, FONT } from './ui.js';
 import { playSong, sfx, setEnabled, isEnabled } from './audio.js';
 import { makeGatoBattle } from './battle.js';
+import { loadAssets } from './assets.js';
 
 /* ------------------------------------------------------------------ */
 /* setup                                                               */
@@ -709,6 +710,10 @@ function update(dt) {
   S.time += dt;
   updateTweens(dt);
   dlg.update(dt);
+  // Presses made during a field cutscene must not queue up and fire the moment
+  // the lock lifts — that would skip the next line or trigger a stray
+  // interaction. Battles hold the lock too but consume taps themselves.
+  if (S.scene === 'field' && S.lock > 0 && !dlg.active) clearTaps();
   S.flash = Math.max(0, S.flash - dt * 2.2);
   S.shake = Math.max(0, S.shake - dt * 2.2);
   if (S.bannerT > 0) S.bannerT -= dt;
@@ -985,9 +990,19 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-export function boot() {
+export async function boot() {
   resize();
   initInput(document);
+
+  // Optional sprite sheets override the built-in art (see assets/README.md).
+  try {
+    const a = await loadAssets();
+    if (a.characters || a.tiles || a.props) {
+      console.log(`[art] custom assets loaded — ${a.characters} character frames, ${a.tiles} tiles, ${a.props} props`);
+    }
+  } catch (e) {
+    console.warn('[art] asset load failed, using built-in art', e);
+  }
   onFirstInput(() => playSong('home'));
 
   const sound = document.getElementById('btn-sound');
