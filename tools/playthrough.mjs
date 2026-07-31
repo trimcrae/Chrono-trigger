@@ -134,26 +134,40 @@ async function centreOn(axis) {
 }
 
 // Follow a BFS route one tile at a time, re-planning if the game disagrees.
-async function walkTo(tx, ty, label, replans = 16) {
+// A long walk crosses a crowd, and every bump costs a re-plan, so the budget is
+// spent on *lack of progress* and wall-clock rather than on a raw attempt count:
+// counting attempts made a 24 tile walk through the fair fail about a third of
+// the time even though the route was open the whole way.
+async function walkTo(tx, ty, label, opts = {}) {
+  const { timeoutMs = 75000, stallLimit = 8 } = opts;
   const first = await state();
   const fromMap = first && first.map;
-  for (let attempt = 0; attempt < replans; attempt++) {
+  const deadline = Date.now() + timeoutMs;
+  let stalled = 0, lastTile = null;
+  while (Date.now() < deadline && stalled < stallLimit) {
     const s = await state();
     if (!s) break;
+    const here = `${s.tileX},${s.tileY}`;
+    stalled = here === lastTile ? stalled + 1 : 0;
+    lastTile = here;
     if (s.map !== fromMap) { log.push(`walk ${label}: map changed ${fromMap} -> ${s.map}`); return s; }
     if (s.tileX === tx && s.tileY === ty) return s;
     if (s.lock > 0 || s.dlg) { await wait(200); continue; }
+
+    // Pinned in a pocket by wanderers: step aside so the next plan starts from
+    // somewhere they are not standing, rather than re-planning the same block.
+    if (stalled >= 3) {
+      const away = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'][stalled % 4];
+      await hold(away, 220);
+      await wait(300);
+    }
 
     const map = await collisionGrid();
     // Prefer a route that goes around bodies; fall back to one that goes through
     // them and let the step loop wait for them to wander off.
     const path = route(map, [s.tileX, s.tileY], [tx, ty])
               || route(map, [s.tileX, s.tileY], [tx, ty], true);
-    if (!path) {
-      if (attempt < replans - 1) { await wait(700); continue; }   // may be a body in a doorway
-      problems.push(`UNREACHABLE: ${label} — no route from ${s.tileX},${s.tileY} to ${tx},${ty} on ${fromMap}`);
-      return s;
-    }
+    if (!path) { await wait(700); continue; }   // usually a body standing in a doorway
     for (let i = 1; i < path.length; i++) {
       const cur = await state();
       if (!cur || cur.map !== fromMap) { log.push(`walk ${label}: map changed mid-route`); return cur; }
@@ -176,7 +190,8 @@ async function walkTo(tx, ty, label, replans = 16) {
     }
   }
   const s = await state();
-  problems.push(`STUCK: ${label} — wanted ${tx},${ty} on ${fromMap}, reached ${s && s.tileX},${s && s.tileY} on ${s && s.map}`);
+  const why = stalled >= stallLimit ? `no progress for ${stallLimit} re-plans` : 'timed out';
+  problems.push(`STUCK: ${label} — wanted ${tx},${ty} on ${fromMap}, reached ${s && s.tileX},${s && s.tileY} on ${s && s.map} (${why})`);
   return s;
 }
 

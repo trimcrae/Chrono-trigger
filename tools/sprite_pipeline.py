@@ -347,6 +347,24 @@ def _draw_authored(pack: dict) -> dict:
     return out
 
 
+def _draw_authored_tiles(pack: dict) -> dict:
+    """Render map tiles from a module in this repository.
+
+    The module exposes ORDER and tile_images(); the keys are the same tile
+    characters the map grids in js/maps.js are written with.
+    """
+    import importlib
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    module = importlib.import_module(pack["tiles_module"])
+    images = module.tile_images()
+    for ch, img in images.items():
+        if img.size != (TILE_W, TILE_H):
+            die(f"tile {ch!r} from {pack['tiles_module']} is {img.size}, expected 16x16")
+    log(f"  drew {len(images)} tile(s)")
+    return images
+
+
 def cmd_build(args: argparse.Namespace) -> int:
     from PIL import Image  # noqa: PLC0415
 
@@ -372,7 +390,10 @@ def cmd_build(args: argparse.Namespace) -> int:
         check_license(pack, allowed)
         log(f"\n=== {pack['id']} ({pack['license']}) ===")
         if pack.get("kind") == "authored":
-            chars.update(_draw_authored(pack))
+            if pack.get("module"):
+                chars.update(_draw_authored(pack))
+            if pack.get("tiles_module"):
+                tiles.update(_draw_authored_tiles(pack))
             credits.append(_credit(pack))
             continue
         images = _open_sources(pack, cache)

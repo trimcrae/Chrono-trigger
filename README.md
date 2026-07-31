@@ -85,14 +85,19 @@ can replace one thing at a time. `assets/README.md` documents the layout, and
 `assets/templates/` contains dumps of the built-in art at the exact cell sizes.
 Load the page with `?noassets=1` to force the built-in art and compare.
 
-The sheet the game ships with is drawn by hand in `tools/art/sprites.py` and
-built into `assets/packs/characters.png` by `tools/sprite_pipeline.py`. The
+The art the game ships with is drawn by hand in `tools/art/` and built into
+`assets/packs/` by `tools/sprite_pipeline.py` — `sprites.py` for the sixteen
+frames of each character, `tiles.py` for the thirty-one map tiles. The
 sprites are original pixel art written to sit in the same visual register as
 SNES-era overworld art — a head about a third of the body, a dark warm outline
 rather than black, one light source, small dark eyes, and a four frame walk with
 a one pixel bob. A shared body carries per-character hair, palettes and props
 (Crono's headband and back-slung katana, Marle's ponytail and pendant, Lucca's
-helmet and glasses), so the whole cast stays consistent.
+helmet and glasses), so the whole cast stays consistent. Tiles come in two kinds:
+ground that repeats across a whole screen — grass, earth, pavement, water,
+carpet — is textured from a fixed seed, because hand-placed noise reads as a
+stamped motif the moment it tiles; everything with a shape is written out as a
+grid.
 
 ```sh
 python3 tools/sprite_pipeline.py build    # redraw assets/packs/ and update the manifest
