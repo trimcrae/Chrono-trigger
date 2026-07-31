@@ -66,9 +66,15 @@ Instead of drawing a sheet by hand you can have one assembled from an upstream
 asset pack. `sources.json` lists the packs; `tools/sprite_pipeline.py` downloads
 the sheets, cuts the cells named in the slice map, and writes
 `packs/characters.png`, `packs/tiles.png` and `packs/prop-*.png` in exactly the
-layout described above — then points the matching slots in `manifest.json` at
-them. Only the slots it generates are touched, so hand-written entries survive a
-rebuild, and `?noassets=1` still forces the built-in art.
+layout described above.
+
+Building a pack and *using* it are separate steps. `"activate"` in `sources.json`
+is what points `manifest.json` at the generated sheets, and it ships **off**: a
+general-purpose pack is a downgrade next to art drawn for this game, so the
+sheets sit under `packs/` until someone asks for them. Flip it to `true`, rebuild,
+and the slots are filled in — only the ones the pipeline generates, so
+hand-written entries survive a rebuild, and `?noassets=1` still forces the drawn
+art either way.
 
 ```sh
 python3 tools/sprite_pipeline.py discover --pack <id> --measure   # what's in an upstream pack

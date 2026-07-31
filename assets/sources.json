@@ -5,8 +5,12 @@
     "Every pack must declare an SPDX license id from allowed_licenses, plus an",
     "author, a license URL and a homepage. Sprites extracted from a commercial",
     "release are not redistributable and must not be listed here.",
-    "Slice maps use [col, row] cell coordinates into the source sheet."
+    "Slice maps use [col, row] cell coordinates into the source sheet.",
+    "'activate' decides whether manifest.json points at the built sheets; with it",
+    "off the sheets are still built under packs/, and the game keeps the art that",
+    "js/pix.js draws for it."
   ],
+  "activate": false,
   "allowed_licenses": [
     "CC0-1.0",
     "CC-BY-3.0",

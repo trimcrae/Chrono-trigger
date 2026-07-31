@@ -14,11 +14,13 @@ Subcommands
 -----------
 discover  List the files in an upstream pack (needs the GitHub API, so it runs
           on an Actions runner) and report image sizes, so the slice map in
-          `assets/sprites/sources.json` can be written against real geometry.
-build     Download every pinned source, verify its checksum, slice it, write the
-          sheets under `assets/packs/`, and merge the slots into
-          `assets/manifest.json`.
-verify    Re-check the built sheets against the manifest without hitting the network.
+          `assets/sources.json` can be written against real geometry.
+build     Download every pinned source, verify its checksum, slice it, and write
+          the sheets under `assets/packs/`. Whether the game actually uses them
+          is a separate switch: only `"activate": true` in sources.json points
+          `assets/manifest.json` at the result.
+verify    Re-check the built sheets, and that the manifest agrees with the
+          activation switch, without hitting the network.
 
 Licensing
 ---------
@@ -390,7 +392,24 @@ def cmd_build(args: argparse.Namespace) -> int:
         slots["props"][name] = rel
         log(f"wrote {out_dir/rel} ({img.width}x{img.height})")
 
-    _merge_manifest(out_dir / "manifest.json", slots)
+    # Always record what was built, so `verify` can check the sheets even when
+    # they are not the art the game is currently using.
+    (pack_dir / "index.json").write_text(
+        json.dumps(slots, indent=2) + "\n", encoding="utf-8"
+    )
+
+    # Building a pack and *using* it are separate decisions: the drawn art in
+    # js/pix.js is tuned for this game, and a generic pack is a downgrade unless
+    # someone actually wants it. Only `"activate": true` points the manifest here.
+    if cfg.get("activate", False):
+        _merge_manifest(out_dir / "manifest.json", slots)
+    else:
+        _clear_manifest(out_dir / "manifest.json")
+        log(
+            "\nsources.json has \"activate\": false — sheets built under "
+            f"{pack_dir}/ but manifest.json still uses the drawn art.\n"
+            "Set it to true (and rebuild) to switch the game over."
+        )
     _write_credits(credits, out_dir / "CREDITS.md")
 
     if args.pin:
@@ -424,6 +443,29 @@ def _merge_manifest(path: Path, slots: dict) -> None:
 
     path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     log(f"wrote {path}")
+
+
+def _clear_manifest(path: Path) -> None:
+    """Release the slots we own, so a deactivated pack stops overriding anything."""
+    if not path.exists():
+        return
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    before = json.dumps(manifest, sort_keys=True)
+
+    for sheet, order_key in (("characters", "characterOrder"), ("tiles", "tileOrder")):
+        cur = manifest.get(sheet)
+        if isinstance(cur, str) and cur.startswith(PACK_DIR + "/"):
+            manifest[sheet] = None
+            manifest.pop(order_key, None)
+    manifest["props"] = {
+        name: file
+        for name, file in (manifest.get("props") or {}).items()
+        if not (isinstance(file, str) and file.startswith(PACK_DIR + "/"))
+    }
+
+    if json.dumps(manifest, sort_keys=True) != before:
+        path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+        log(f"cleared generated slots in {path}")
 
 
 def _write_credits(credits: list[dict], path: Path) -> None:
@@ -483,14 +525,31 @@ def cmd_verify(args: argparse.Namespace) -> int:
     from PIL import Image  # noqa: PLC0415
 
     out_dir = Path(args.out)
-    mf_path = out_dir / "manifest.json"
-    if not mf_path.exists():
-        die(f"missing {mf_path} — run `build` first")
-    manifest = json.loads(mf_path.read_text(encoding="utf-8"))
+    index_path = out_dir / PACK_DIR / "index.json"
+    if not index_path.exists():
+        die(f"missing {index_path} — run `build` first")
 
-    allowed = load_sources(Path(args.sources)).get("allowed_licenses", [])
+    cfg = load_sources(Path(args.sources))
+    allowed = cfg.get("allowed_licenses", [])
     problems: list[str] = []
     counts = {"characters": 0, "tiles": 0, "props": 0}
+
+    # The sheets are checked from the build index, so they stay verified even
+    # when "activate" is false and the game is still on its drawn art.
+    manifest = json.loads(index_path.read_text(encoding="utf-8"))
+
+    mf_path = out_dir / "manifest.json"
+    live = json.loads(mf_path.read_text(encoding="utf-8")) if mf_path.exists() else {}
+    active = cfg.get("activate", False)
+    for sheet in ("characters", "tiles"):
+        points_here = isinstance(live.get(sheet), str) and live[sheet].startswith(PACK_DIR + "/")
+        if active and manifest.get(sheet) and not points_here:
+            problems.append(f"manifest.json does not use the generated {sheet} sheet")
+        if not active and points_here:
+            problems.append(
+                f"manifest.json still points {sheet} at {live[sheet]} "
+                'while sources.json has "activate": false'
+            )
 
     credits = (out_dir / "CREDITS.md").read_text(encoding="utf-8") if (out_dir / "CREDITS.md").exists() else ""
     for line in credits.splitlines():
@@ -550,7 +609,8 @@ def cmd_verify(args: argparse.Namespace) -> int:
 
     log(
         f"ok: {counts['characters']} character(s), {counts['tiles']} tile(s), "
-        f"{counts['props']} prop(s) verified against {mf_path}"
+        f"{counts['props']} prop(s) verified in {out_dir / PACK_DIR}"
+        + ("" if active else " (built, not active — manifest.json keeps the drawn art)")
     )
     return 0
 

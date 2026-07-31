@@ -1,0 +1,28 @@
+{
+  "characters": "packs/characters.png",
+  "tiles": "packs/tiles.png",
+  "props": {},
+  "characterOrder": [
+    "crono",
+    "marle",
+    "lucca",
+    "mom",
+    "taban",
+    "villager1",
+    "villager2",
+    "villager3",
+    "kid",
+    "guard",
+    "cat"
+  ],
+  "tileOrder": [
+    ".",
+    ",",
+    "=",
+    "P",
+    "~",
+    "T",
+    "C",
+    "W"
+  ]
+}
