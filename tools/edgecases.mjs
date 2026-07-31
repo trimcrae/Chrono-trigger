@@ -12,7 +12,16 @@ const BASE = process.argv[2] || 'http://localhost:8125';
 const problems = [];
 const notes = [];
 
-const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
+// This container ships a Chromium at a fixed path; a CI runner uses the one
+// playwright installs. Prefer an explicit override, then the local build, then
+// whatever playwright resolves by itself.
+import { existsSync } from 'node:fs';
+const LOCAL_CHROMIUM = '/opt/pw-browsers/chromium';
+const launchOpts = process.env.PLAYWRIGHT_CHROMIUM
+  ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM }
+  : existsSync(LOCAL_CHROMIUM) ? { executablePath: LOCAL_CHROMIUM } : {};
+
+const browser = await chromium.launch(launchOpts);
 const page = await browser.newPage({ viewport: { width: 512, height: 448 } });
 page.on('pageerror', e => problems.push(`PAGE ERROR: ${e.message}`));
 page.on('console', m => { if (m.type() === 'error') problems.push(`CONSOLE ERROR: ${m.text()}`); });

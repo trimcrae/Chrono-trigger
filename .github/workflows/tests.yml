@@ -1,0 +1,65 @@
+name: Game tests
+
+# The two browser tests drive the built game exactly as a player would, so this
+# catches a regression in the engine, the story wiring or the art pipeline.
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  play:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install playwright chromium
+        run: |
+          npm init -y >/dev/null
+          npm i --silent playwright
+          npx playwright install --with-deps chromium
+
+      - name: Check the art pipeline still reproduces the committed sheets
+        run: |
+          python -m pip install --quiet 'pillow>=10,<12'
+          python tools/sprite_pipeline.py build
+          python tools/sprite_pipeline.py verify
+          if ! git diff --quiet -- assets; then
+            echo '::error::assets/ is stale — run tools/sprite_pipeline.py build and commit the result'
+            git --no-pager diff --stat -- assets
+            exit 1
+          fi
+
+      - name: Serve the game
+        run: |
+          python -m http.server 8125 --directory . >/tmp/serve.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:8125/index.html && break
+            sleep 1
+          done
+
+      - name: Playthrough
+        run: node tools/playthrough.mjs http://localhost:8125 "$RUNNER_TEMP/play"
+
+      - name: Edge cases
+        run: node tools/edgecases.mjs http://localhost:8125
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playthrough-screens
+          path: ${{ runner.temp }}/play
+          if-no-files-found: ignore
+          retention-days: 14
