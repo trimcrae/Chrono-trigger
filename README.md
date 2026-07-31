@@ -4,7 +4,7 @@ A playable, in-browser recreation of the opening chapter of *Chrono Trigger*: Cr
 gets his allowance from Mom, walks north to Leene Square, bumps into Marle, plays the Fair,
 and watches Lucca's Telepod tear a gate open in the middle of the exhibition.
 
-**Play it:** https://trimcrae.github.io/chrono-trigger/
+**Play it:** https://trimcrae.github.io/Chrono-trigger/
 
 Works on desktop (keyboard) and on phones (on-screen D-pad + A/B buttons).
 
