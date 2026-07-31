@@ -44,7 +44,7 @@ jobs:
       # The server has to start and stop inside the step that uses it. Left
       # backgrounded in a step of its own the runner waits on the child and the
       # step never finishes.
-      - name: Play the chapter and sweep the edge cases
+      - name: Play the chapter, sweep the edge cases, and fight Gato
         run: |
           set -euo pipefail
           nohup python -m http.server 8125 --directory . >/tmp/serve.log 2>&1 </dev/null &
@@ -58,6 +58,7 @@ jobs:
 
           node tools/playthrough.mjs http://localhost:8125 "$RUNNER_TEMP/play"
           node tools/edgecases.mjs http://localhost:8125
+          node tools/battle.mjs http://localhost:8125
 
       - name: Upload screenshots
         if: always()

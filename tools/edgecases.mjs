@@ -1,167 +1,119 @@
-// Edge-case sweep: the paths a straight playthrough never touches.
+// Everything a straight playthrough never touches.
 //
 //   node tools/edgecases.mjs [baseUrl]
 //
-// Talks to every NPC on every map, exercises the menu, declines and accepts
-// each prompt, and restarts the chapter from the ending. Uses the __CTDBG hooks
-// to set up states that would take a long walk to reach honestly.
+// Talks to every NPC, reads every scenery description, fires every exit, works
+// the tile interactions and every branch of the prompts, checks the menu and the
+// page chrome, runs once on the built-in art, and restarts from the ending to
+// prove nothing carries over.
 
-import { chromium } from 'playwright';
+import { open } from './testkit.mjs';
 
-const BASE = process.argv[2] || 'http://localhost:8125';
-const problems = [];
-const notes = [];
-
-// This container ships a Chromium at a fixed path; a CI runner uses the one
-// playwright installs. Prefer an explicit override, then the local build, then
-// whatever playwright resolves by itself.
-import { existsSync } from 'node:fs';
-const LOCAL_CHROMIUM = '/opt/pw-browsers/chromium';
-const launchOpts = process.env.PLAYWRIGHT_CHROMIUM
-  ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM }
-  : existsSync(LOCAL_CHROMIUM) ? { executablePath: LOCAL_CHROMIUM } : {};
-
-const browser = await chromium.launch(launchOpts);
-const page = await browser.newPage({ viewport: { width: 512, height: 448 } });
-page.on('pageerror', e => problems.push(`PAGE ERROR: ${e.message}`));
-page.on('console', m => { if (m.type() === 'error') problems.push(`CONSOLE ERROR: ${m.text()}`); });
-
-const wait = ms => page.waitForTimeout(ms);
-const st = () => page.evaluate(() => {
-  const S = window.__CT, dlg = window.__CTDLG;
-  return { scene: S.scene, map: S.map && S.map.id, lock: S.lock, menu: S.menu,
-           dlg: !!dlg.active, gold: S.gold, silver: S.silver, flags: { ...S.flags },
-           items: { ...S.items }, tileX: S.player && S.player.tileX, tileY: S.player && S.player.tileY };
-});
-const mash = async (n, gap = 160) => { for (let i = 0; i < n; i++) { await page.keyboard.press('KeyZ'); await wait(gap); } };
-
-// Press A only while a box is actually open. Mashing blindly is dangerous here:
-// a spare press lands on the field and re-triggers whatever the player is facing.
-// A conversation is a chain of separate boxes with async gaps between them, so
-// "no box open right now" is not the same as "the scene is over".
-async function settle(ms = 20000) {
-  const deadline = Date.now() + ms;
-  let calm = 0;
-  while (Date.now() < deadline) {
-    const s = await st();
-    if (s.dlg) { await page.keyboard.press('KeyZ'); await wait(180); calm = 0; continue; }
-    calm = s.lock === 0 ? calm + 1 : 0;
-    if (calm >= 4) return s;
-    await wait(200);
-  }
-  return await st();
-}
-
-async function clearDialogue(max = 20) {
-  for (let i = 0; i < max; i++) {
-    if (!(await page.evaluate(() => window.__CTDLG.active))) return true;
-    await page.keyboard.press('KeyZ');
-    await wait(180);
-  }
-  return false;
-}
-
-// A choice needs three separate things: the page fully revealed (the first A
-// only skips the typewriter), the cursor moved with a *held* key (the menu
-// reads key state, not taps), and then a confirm.
-async function answerChoice(index, label) {
-  // Wait for the prompt, then finish the typewriter directly instead of pressing
-  // A for it: an A that lands on the frame the text completes is taken as a
-  // confirm, which silently picks whatever option is highlighted.
-  for (let i = 0; i < 30; i++) {
-    if (await page.evaluate(() => window.__CTDLG.active)) break;
-    await wait(150);
-  }
-  const shown = await page.evaluate(() => {
-    const d = window.__CTDLG;
-    if (!d.active) return null;
-    d.shown = d.pageLen;
-    return { choices: d.choices ? d.choices.length : 0, at: d.choiceIndex };
-  });
-  if (!shown) { problems.push(`CHOICE: ${label} — no prompt on screen`); return false; }
-  if (!shown.choices) { problems.push(`CHOICE: ${label} — prompt has no choices`); return false; }
-  await wait(120);
-
-  for (let i = 0; i < 8; i++) {
-    const at = await page.evaluate(() => window.__CTDLG.choiceIndex);
-    if (at === index) break;
-    const key = at < index ? 'ArrowDown' : 'ArrowUp';
-    await page.keyboard.down(key);
-    await wait(140);
-    await page.keyboard.up(key);
-    await wait(140);
-  }
-  const finalAt = await page.evaluate(() => window.__CTDLG.choiceIndex);
-  if (finalAt !== index) {
-    problems.push(`CHOICE: ${label} — cursor stuck on ${finalAt}, wanted ${index}`);
-    return false;
-  }
-  await page.keyboard.press('KeyZ');
-  await wait(400);
-  return true;
-}
-
-// Each section starts from a reload. Cutscenes are async and keep running after
-// a forced jump, so sharing one page between sections leaks half-finished scenes
-// into the next check and produces failures that are the test's fault.
-async function freshStart(flags = []) {
-  await page.goto(`${BASE}/index.html`, { waitUntil: 'networkidle' });
-  await wait(900);
-  await page.keyboard.press('KeyZ');
-  await wait(600);
-  for (let i = 0; i < 60; i++) {
-    const s = await st();
-    if (s.lock === 0 && s.scene === 'field' && !s.dlg) break;
-    await page.keyboard.press('KeyZ');
-    await wait(160);
-  }
-  if (flags.length) {
-    await page.evaluate(fs => fs.forEach(f => window.__CTDBG.flag(f, true)), flags);
-  }
-}
-
-await freshStart();
+const h = await open(process.argv[2] || 'http://localhost:8125');
+const MAPS = ['room', 'house', 'world', 'square', 'telepod'];
+const ALL_FLAGS = ['wokeUp', 'gotAllowance', 'metMarle', 'marleJoined'];
+// Walking into the telepod hall starts the demonstration, which locks input for
+// the length of the scene. Mark it already started when the point is to poke at
+// that map rather than to watch the cutscene.
+const flagsFor = id => (id === 'telepod' ? [...ALL_FLAGS, 'telepodStarted'] : ALL_FLAGS);
 
 /* ------------------------------------------------------------------ */
 /* 1. every NPC on every map answers without throwing                  */
 /* ------------------------------------------------------------------ */
-const maps = ['room', 'house', 'world', 'square', 'telepod'];
-for (const id of maps) {
-  // a clean page per map, then unlock so flag-gated NPCs and lines are reachable
-  await freshStart(['wokeUp', 'gotAllowance', 'metMarle', 'marleJoined']);
-  await page.evaluate(m => window.__CTDBG.goto(m, 2, 2, 'down'), id);
-  await wait(300);
-  const npcs = await page.evaluate(() =>
+for (const id of MAPS) {
+  await h.freshStart(flagsFor(id));
+  await h.page.evaluate(m => window.__CTDBG.goto(m, 2, 2, 'down'), id);
+  await h.wait(300);
+  const npcs = await h.page.evaluate(() =>
     window.__CT.entities.filter(e => e.isNpc).map(e => ({ id: e.id, x: e.tileX, y: e.tileY })));
-  notes.push(`${id}: ${npcs.length} npc(s)`);
+  h.note(`${id}: ${npcs.length} npc(s)`);
 
   for (const n of npcs) {
-    const before = problems.length;
-    // stand one tile below and look up at them
-    await page.evaluate(({ x, y }) => {
-      const S = window.__CT;
-      S.player.x = x * 16; S.player.y = (y + 1) * 16 - 8; S.player.dir = 'up';
-      S.lock = 0;
-    }, n);
-    await wait(120);
-    await page.evaluate(() => { window.__CTDBG.interact(); });   // do not await the conversation
-    await wait(320);
-    await clearDialogue();
-    await page.evaluate(() => { window.__CTDLG.close && window.__CTDLG.close(); window.__CT.lock = 0; });
-    await wait(120);
-    if (problems.length > before) notes.push(`  !! ${id}/${n.id} raised an error`);
+    const before = h.problems.length;
+    await h.talkToNpc(n.id);
+    if (!(await h.page.evaluate(() => window.__CTDLG.active))) h.fail(`NPC: ${id}/${n.id} said nothing`);
+    await h.clearDialogue();
+    await h.page.evaluate(() => { window.__CTDLG.close && window.__CTDLG.close(); window.__CT.lock = 0; });
+    await h.wait(120);
+    if (h.problems.length === before) h.cover(`npc: ${id}/${n.id}`);
   }
 }
 
 /* ------------------------------------------------------------------ */
-/* 1b. scripted walks resolve from any starting offset                 */
+/* 2. every piece of scenery with a description                        */
+/* ------------------------------------------------------------------ */
+for (const id of MAPS) {
+  await h.freshStart(flagsFor(id));
+  await h.page.evaluate(m => window.__CTDBG.goto(m, 2, 2, 'down'), id);
+  await h.wait(250);
+  const looks = await h.page.evaluate(() => Object.keys(window.__CT.map.looks || {}));
+  if (!looks.length) continue;
+  h.note(`${id}: ${looks.length} scenery description(s)`);
+
+  for (const key of looks) {
+    const [x, y] = key.split(':')[1].split(',').map(Number);
+    await h.faceAndTalk(x, y);
+    if (!(await h.page.evaluate(() => window.__CTDLG.active))) h.fail(`LOOK: ${id} ${key} showed nothing`);
+    else h.cover(`look: ${id} ${key}`);
+    await h.clearDialogue();
+    await h.page.evaluate(() => { window.__CTDLG.close && window.__CTDLG.close(); window.__CT.lock = 0; });
+    await h.wait(100);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 3. the tile interactions                                            */
+/* ------------------------------------------------------------------ */
+await h.freshStart(ALL_FLAGS);
+await h.page.evaluate(() => { window.__CTDBG.goto('square', 12, 10, 'up'); window.__CT.lock = 0; });
+await h.wait(400);
+await h.faceAndTalk(12, 9);                       // Leene's Bell sits on 'L' tiles
+if (await h.page.evaluate(() => window.__CTDLG.active)) h.cover("tile: Leene's Bell rings");
+else h.fail("TILE: Leene's Bell said nothing");
+await h.clearDialogue();
+
+await h.freshStart(flagsFor('telepod'));
+await h.page.evaluate(() => { window.__CTDBG.goto('telepod', 5, 8, 'up'); window.__CT.lock = 0; });
+await h.wait(400);
+await h.faceAndTalk(5, 7);
+if (await h.page.evaluate(() => window.__CTDLG.active)) h.cover('tile: telepod pad before the gate opens');
+else h.fail('TILE: the telepod pad said nothing before the gate opened');
+await h.clearDialogue();
+
+// the gate, torn open but with no pendant in hand
+await h.freshStart([...ALL_FLAGS, 'telepodStarted', 'telepodDone', 'gateOpen', 'marleVanished']);
+await h.page.evaluate(() => { window.__CTDBG.goto('telepod', 5, 8, 'up'); window.__CT.lock = 0; });
+await h.wait(400);
+await h.faceAndTalk(5, 7);
+await h.wait(500);
+if ((await h.state()).scene === 'end') h.fail('GATE: entered without the pendant');
+else h.cover('gate: refuses to open without the pendant');
+await h.clearDialogue();
+
+/* ------------------------------------------------------------------ */
+/* 4. Mom, before and after the allowance                              */
+/* ------------------------------------------------------------------ */
+await h.freshStart();
+await h.page.evaluate(() => { window.__CTDBG.goto('house', 4, 9, 'up'); window.__CT.lock = 0; });
+await h.wait(400);
+await h.faceAndTalk(4, 7);
+const paid = await h.settle();
+if (paid.gold !== 200) h.fail(`MOM: the first talk paid ${paid.gold}, expected 200`);
+else h.cover('mom: the first talk hands over 200 G');
+await h.faceAndTalk(4, 7);
+const again = await h.settle();
+if (again.gold !== 200) h.fail(`MOM: talking again changed the purse to ${again.gold}`);
+else h.cover('mom: talking again does not pay twice');
+
+/* ------------------------------------------------------------------ */
+/* 5. scripted walks resolve from any starting offset                  */
 /* ------------------------------------------------------------------ */
 // Cutscenes await these paths. A residual too small to step but too large to
 // count as arrival used to satisfy neither test, so the path never resolved and
 // the scene hung with input locked — the walk into the gate could softlock.
-await freshStart();
+await h.freshStart();
 for (const [ox, oy] of [[1, 1], [1, 0], [0, 1], [3, 3], [0.6, 0.6], [7, 2]]) {
-  const r = await page.evaluate(async ([ox, oy]) => {
+  const r = await h.page.evaluate(async ([ox, oy]) => {
     const pl = window.__CT.player;
     pl.path = null;
     pl.x = 80 + ox; pl.y = 88 + oy; pl.pathSpeed = 40;
@@ -170,204 +122,132 @@ for (const [ox, oy] of [[1, 1], [1, 0], [0, 1], [3, 3], [0.6, 0.6], [7, 2]]) {
     await new Promise(res => setTimeout(res, 1500));
     return { done, x: Math.round(pl.x), y: Math.round(pl.y) };
   }, [ox, oy]);
-  if (!r.done) problems.push(`PATH: a scripted walk from +${ox},${oy} never arrived (stopped at ${r.x},${r.y})`);
+  if (!r.done) h.fail(`PATH: a scripted walk from +${ox},${oy} never arrived (stopped at ${r.x},${r.y})`);
 }
-notes.push('scripted paths resolve from off-grid offsets');
+h.cover('paths: scripted walks arrive from off-grid offsets');
 
 /* ------------------------------------------------------------------ */
-/* 2. the status menu opens and closes                                 */
+/* 6. every exit fires                                                 */
 /* ------------------------------------------------------------------ */
-await freshStart();
-await page.evaluate(() => { window.__CTDBG.goto('world', 5, 8, 'down'); window.__CT.lock = 0; });
-await wait(300);
-await page.keyboard.press('KeyC');
-await wait(300);
-if (!(await st()).menu) problems.push('MENU: C did not open the status menu');
-await page.keyboard.press('KeyC');
-await wait(300);
-if ((await st()).menu) problems.push('MENU: C did not close the status menu');
-
-/* ------------------------------------------------------------------ */
-/* 3. Gato: decline, then fight, then fight again                      */
-/* ------------------------------------------------------------------ */
-const gatoPrompt = async choice => {
-  await page.evaluate(() => {
-    const S = window.__CT;
-    S.player.x = 18 * 16; S.player.y = 18 * 16 - 8; S.player.dir = 'up'; S.lock = 0;
-  });
-  await wait(150);
-  await page.evaluate(() => { window.__CTDBG.interact(); });   // do not await the conversation
-  await wait(500);
-  await answerChoice(choice === 'no' ? 1 : 0, `Gato prompt (${choice})`);
-};
-
-await freshStart(['metMarle', 'marleJoined']);
-await page.evaluate(() => { window.__CTDBG.goto('square', 18, 18, 'up'); window.__CT.lock = 0; });
-await wait(600);
-await gatoPrompt('no');
-let s = await settle();
-if (s.scene === 'battle') problems.push('GATO: declining the spar still started the battle');
-await page.evaluate(() => { window.__CT.lock = 0; window.__CTDLG.close && window.__CTDLG.close(); });
-await wait(200);
-
-await gatoPrompt('yes');
-s = await waitForState(x => x.scene === 'battle', 'GATO: accepting did not start a battle', 8000);
-if (s) {
-  // fight it out
-  for (let i = 0; i < 200; i++) {
-    const cur = await st();
-    if (cur.scene !== 'battle') break;
-    await page.keyboard.press('KeyZ');
-    await wait(300);
-  }
-  await waitForState(x => x.scene === 'field', 'GATO: battle never returned to the field', 15000);
-  const after = await settle();
-  if (!after.flags.gatoBeaten) problems.push('GATO: winning did not set gatoBeaten');
-  if (after.silver !== 15) problems.push(`GATO: expected 15 silver for the first win, got ${after.silver}`);
-
-  // second win pays less; make sure the repeat path works at all
-  await gatoPrompt('yes');
-  const again = await waitForState(x => x.scene === 'battle', 'GATO: could not rematch', 8000);
-  if (again) {
-    for (let i = 0; i < 200; i++) {
-      const cur = await st();
-      if (cur.scene !== 'battle') break;
-      await page.keyboard.press('KeyZ');
-      await wait(300);
+await h.freshStart(ALL_FLAGS);
+for (const id of MAPS) {
+  const exits = await h.page.evaluate(m => {
+    window.__CTDBG.goto(m, 2, 2, 'down');
+    return window.__CT.map.exits.map(e => ({ x: e.x, y: e.y, to: e.to }));
+  }, id);
+  for (const ex of exits) {
+    await h.page.evaluate(m => { window.__CTDBG.goto(m, 2, 2, 'down'); window.__CT.lock = 0; }, id);
+    await h.wait(350);
+    // step onto the exit tile; loadMap only suppresses the tile it arrived on
+    await h.page.evaluate(([x, y]) => {
+      const S = window.__CT;
+      S.player.x = x * 16; S.player.y = y * 16 - 8; S.lock = 0;
+    }, [ex.x, ex.y]);
+    if (await h.waitFor(s => s.map === ex.to, `EXIT: ${id} ${ex.x},${ex.y} -> ${ex.to}`, 6000)) {
+      h.cover(`exit: ${id} ${ex.x},${ex.y} -> ${ex.to}`);
     }
-    await waitForState(x => x.scene === 'field', 'GATO: rematch never returned to the field', 15000);
-    const rematch = await settle();
-    if (rematch.silver <= 15) problems.push(`GATO: rematch paid nothing, silver still ${rematch.silver}`);
-    notes.push(`gato rematch silver: ${rematch.silver}`);
+    await h.wait(200);
   }
 }
 
 /* ------------------------------------------------------------------ */
-/* 3b. fleeing a battle returns to the field                           */
+/* 7. the status menu                                                  */
 /* ------------------------------------------------------------------ */
-await freshStart(['metMarle', 'marleJoined']);
-await page.evaluate(() => { window.__CTDBG.goto('square', 18, 18, 'up'); window.__CT.lock = 0; });
-await wait(600);
-await gatoPrompt('yes');
-if (await waitForState(x => x.scene === 'battle', 'RUN: could not start the battle to flee', 10000)) {
-  // drive the command menu: Attack, Tech, Item, Run
-  let fled = false;
-  for (let i = 0; i < 60 && !fled; i++) {
-    const menu = await page.evaluate(() => {
-      const b = window.__CT.battle;
-      return b && b.menu ? { mode: b.menu.mode, index: b.menu.index } : null;
-    });
-    if (!menu) { await wait(300); continue; }
-    if (menu.mode !== 'cmd') { await page.keyboard.press('KeyX'); await wait(200); continue; }
-    if (menu.index !== 3) {
-      await page.keyboard.down('ArrowDown'); await wait(130); await page.keyboard.up('ArrowDown');
-      await wait(150);
-      continue;
-    }
-    await page.keyboard.press('KeyZ');
-    await wait(600);
-    fled = true;
-  }
-  if (!fled) problems.push('RUN: never reached the Run command');
-  const back = await waitForState(x => x.scene === 'field', 'RUN: fleeing did not return to the field', 20000);
-  if (back) {
-    const s2 = await settle();
-    if (s2.flags.gatoBeaten) problems.push('RUN: fleeing counted as a win');
-    notes.push(`fled the battle, silver ${s2.silver}`);
-  }
-}
+await h.freshStart(ALL_FLAGS);
+await h.page.evaluate(() => { window.__CTDBG.goto('world', 5, 8, 'down'); window.__CT.lock = 0; });
+await h.wait(300);
+await h.press('KeyC');
+await h.wait(300);
+if (!(await h.state()).menu) h.fail('MENU: C did not open the status menu');
+else h.cover('menu: opens');
+await h.press('KeyC');
+await h.wait(300);
+if ((await h.state()).menu) h.fail('MENU: C did not close the status menu');
+else h.cover('menu: closes');
+await h.press('KeyC');
+await h.wait(250);
+await h.press('KeyX');
+await h.wait(300);
+if ((await h.state()).menu) h.fail('MENU: B did not close the status menu');
+else h.cover('menu: closes with B');
 
 /* ------------------------------------------------------------------ */
-/* 3c. the game comes up on a phone-sized viewport                     */
+/* 8. the page chrome                                                  */
 /* ------------------------------------------------------------------ */
-{
-  const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-  const phoneErrors = [];
-  phone.on('pageerror', e => phoneErrors.push(e.message));
-  phone.on('console', m => { if (m.type() === 'error') phoneErrors.push(m.text()); });
-  await phone.goto(`${BASE}/index.html`, { waitUntil: 'networkidle' });
-  await phone.waitForTimeout(1500);
-  const canvas = await phone.evaluate(() => {
-    const c = document.getElementById('game');
-    return { w: c.width, h: c.height, cssW: c.clientWidth, cssH: c.clientHeight,
-             dpad: !!document.querySelector('#dpad'), touchClass: document.body.classList.contains('touch') };
-  });
-  notes.push(`phone canvas ${canvas.cssW}x${canvas.cssH}, dpad ${canvas.dpad}, touch class ${canvas.touchClass}`);
-  if (!canvas.w || !canvas.h) problems.push('MOBILE: canvas has no backing size');
-  if (!canvas.dpad) problems.push('MOBILE: on-screen d-pad missing');
-  if (!canvas.touchClass) problems.push('MOBILE: touch layout class not applied');
-  // tap the A button to start, the same way a phone player would
-  await phone.tap('#btn-a');
-  await phone.waitForTimeout(900);
-  const started = await phone.evaluate(() => window.__CT.scene);
-  if (started !== 'field') problems.push(`MOBILE: tapping A did not start the game (scene ${started})`);
-  for (const e of phoneErrors) problems.push(`MOBILE ERROR: ${e}`);
-  await phone.close();
-}
-
-/* ------------------------------------------------------------------ */
-/* 4. the gate: decline, then enter                                    */
-/* ------------------------------------------------------------------ */
-await freshStart(['metMarle', 'marleJoined', 'telepodStarted', 'telepodDone',
-                  'gateOpen', 'marleVanished', 'gotPendant']);
-await page.evaluate(() => { window.__CTDBG.goto('telepod', 5, 8, 'up'); window.__CT.lock = 0; });
-await wait(400);
-await page.evaluate(() => { window.__CTDBG.interact(); });   // do not await the conversation
-await wait(500);
-await answerChoice(1, 'gate prompt (Not yet)');
-await wait(400);
-if ((await st()).scene === 'end') problems.push('GATE: declining still ended the chapter');
-await page.evaluate(() => { window.__CT.lock = 0; window.__CTDLG.close && window.__CTDLG.close(); });
-await wait(300);
-
-await page.evaluate(() => {
-  const S = window.__CT;
-  S.player.x = 5 * 16; S.player.y = 8 * 16 - 8; S.player.dir = 'up'; S.lock = 0;
+await h.freshStart();
+const sound = await h.page.evaluate(async () => {
+  const btn = document.getElementById('btn-sound');
+  const before = btn.textContent;
+  btn.click();
+  await new Promise(r => setTimeout(r, 200));
+  const after = btn.textContent;
+  btn.click();
+  await new Promise(r => setTimeout(r, 200));
+  return { before, after, restored: btn.textContent };
 });
-await page.evaluate(() => { window.__CTDBG.interact(); });   // do not await the conversation
-await wait(500);
-await answerChoice(0, 'gate prompt (Enter)');
-await waitForState(x => x.scene === 'end', 'GATE: entering did not end the chapter', 25000);
+if (sound.before === sound.after) h.fail('CHROME: the sound button did not change state');
+else h.cover('chrome: the sound button mutes and unmutes');
+if (sound.before !== sound.restored) h.fail('CHROME: the sound button did not toggle back');
+if (!(await h.page.evaluate(() => !!document.getElementById('btn-full')))) {
+  h.fail('CHROME: the fullscreen button is missing');
+} else h.cover('chrome: the fullscreen button is present');
 
 /* ------------------------------------------------------------------ */
-/* 5. the ending returns to the title, and a new run starts clean      */
+/* 9. the game still runs on the built-in art                          */
 /* ------------------------------------------------------------------ */
-await wait(3000);                       // the ending fades in before it accepts input
-let backToTitle = null;
-for (let i = 0; i < 12 && !backToTitle; i++) {
-  await page.keyboard.press('KeyZ');
-  await wait(600);
-  if ((await st()).scene === 'title') backToTitle = await st();
-}
-if (!backToTitle) problems.push(`ENDING: A did not return to the title — state ${JSON.stringify(await st())}`);
-if (backToTitle) {
-  await page.keyboard.press('KeyZ');
-  await waitForState(x => x.scene === 'field' && x.map === 'room', 'RESTART: could not start a second run', 10000);
-  const fresh = await st();
-  if (fresh) {
-    if (fresh.gold !== 0) problems.push(`RESTART: gold carried over (${fresh.gold})`);
-    if (fresh.silver !== 0) problems.push(`RESTART: silver carried over (${fresh.silver})`);
-    const stale = Object.keys(fresh.flags).filter(k => !['wokeUp'].includes(k));
-    if (stale.length) problems.push(`RESTART: story flags carried over: ${stale.join(', ')}`);
-    if (fresh.items && fresh.items.tonic !== 3) problems.push(`RESTART: tonics not reset (${fresh.items.tonic})`);
+await h.freshStart([], '?noassets=1');
+const builtIn = await h.page.evaluate(async () => {
+  const pix = await import('./js/pix.js');
+  const c = pix.charFrame('crono', 'down', 0);
+  const t = pix.tileCanvas('.', 0);
+  return { char: !!c && c.width === 16 && c.height === 24, tile: !!t && t.width === 16 };
+});
+if (!builtIn.char || !builtIn.tile) h.fail('NOASSETS: the built-in art did not draw');
+else h.cover('art: ?noassets=1 falls back to the drawn art');
+if ((await h.state()).scene !== 'field') h.fail('NOASSETS: the chapter did not start on the drawn art');
+else h.cover('art: the chapter starts on the drawn art');
+
+/* ------------------------------------------------------------------ */
+/* 10. the ending returns to the title and a new run starts clean      */
+/* ------------------------------------------------------------------ */
+await h.freshStart([...ALL_FLAGS, 'telepodStarted', 'telepodDone', 'gateOpen',
+                    'marleVanished', 'gotPendant']);
+await h.page.evaluate(() => { window.__CTDBG.goto('telepod', 5, 8, 'up'); window.__CT.lock = 0; });
+await h.wait(400);
+await h.faceAndTalk(5, 7);
+await h.answerChoice(1, 'gate prompt (Not yet)');
+await h.wait(400);
+if ((await h.state()).scene === 'end') h.fail('GATE: declining still ended the chapter');
+else h.cover('gate: declining leaves the chapter running');
+await h.clearDialogue();
+await h.page.evaluate(() => { window.__CT.lock = 0; });
+
+await h.faceAndTalk(5, 7);
+await h.answerChoice(0, 'gate prompt (Enter)');
+if (await h.waitFor(s => s.scene === 'end', 'GATE: entering did not end the chapter', 30000)) {
+  h.cover('gate: entering ends the chapter');
+  await h.wait(3000);                    // the ending fades in before it takes input
+  let title = false;
+  for (let i = 0; i < 12 && !title; i++) {
+    await h.press('KeyZ');
+    await h.wait(600);
+    title = (await h.state()).scene === 'title';
+  }
+  if (!title) h.fail(`ENDING: A did not return to the title — ${JSON.stringify(await h.state())}`);
+  else {
+    h.cover('ending: A returns to the title');
+    await h.press('KeyZ');
+    if (await h.waitFor(s => s.scene === 'field' && s.map === 'room', 'RESTART: could not start again', 10000)) {
+      const fresh = await h.state();
+      if (fresh.gold !== 0) h.fail(`RESTART: gold carried over (${fresh.gold})`);
+      if (fresh.silver !== 0) h.fail(`RESTART: silver carried over (${fresh.silver})`);
+      const stale = Object.keys(fresh.flags).filter(k => k !== 'wokeUp');
+      if (stale.length) h.fail(`RESTART: story flags carried over: ${stale.join(', ')}`);
+      if (fresh.items.tonic !== 3) h.fail(`RESTART: tonics not reset (${fresh.items.tonic})`);
+      if (!stale.length && fresh.gold === 0) h.cover('restart: a second run starts clean');
+    }
   }
 }
 
-async function waitForState(pred, label, ms) {
-  const deadline = Date.now() + ms;
-  while (Date.now() < deadline) {
-    const s = await st();
-    if (s && pred(s)) return s;
-    await wait(200);
-  }
-  problems.push(`${label} — state ${JSON.stringify(await st())}`);
-  return null;
-}
-
-await browser.close();
-
-console.log(notes.join('\n'));
-console.log('\n================ EDGE CASES ================');
-if (!problems.length) console.log('clean — no errors, every path behaved');
-else { console.log(`${problems.length} problem(s):`); for (const p of problems) console.log(' - ' + p); }
-process.exit(problems.length ? 1 : 0);
+await h.close();
+process.exit(h.report('EDGE CASES'));

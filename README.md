@@ -57,24 +57,36 @@ python3 -m http.server 8000   # then open http://localhost:8000
 
 ## Tests
 
-Two scripted browser tests drive the real game through the real keyboard path.
+Three scripted browser tests drive the real game through the real keyboard path.
 They need a static server on the given URL and `npm i playwright`:
 
 ```sh
 node tools/playthrough.mjs http://localhost:8000   # the chapter, start to finish
-node tools/edgecases.mjs   http://localhost:8000   # the paths a straight run misses
+node tools/edgecases.mjs   http://localhost:8000   # everything a straight run misses
+node tools/battle.mjs      http://localhost:8000   # the ATB battle, every command and outcome
 ```
 
 `playthrough.mjs` plays the chapter — title, allowance, the walk to Leene Square,
 the collision with Marle, a purchase, the Gato battle, the Telepod and the gate —
-asserting on story flags at each beat and shooting every scene to `/tmp/play`.
-`edgecases.mjs` talks to every NPC on every map, opens the menu, declines and
-accepts each prompt, flees a battle, rematches Gato, and restarts from the ending
-to check nothing carries over. Both fail loudly on a page error, a stall, or a
-step that never reaches the state it expects.
+asserting on story flags at each beat and shooting every scene to `/tmp/play`. It
+routes with breadth-first search over the game's own collision, so a wandering
+crowd cannot wedge it.
 
-They read `window.__CT` / `__CTDLG` / `__CTDBG`, the debug handles `js/game.js`
-already exposes.
+`edgecases.mjs` covers what that never reaches: every NPC on every map, every
+piece of scenery with a description, every exit, Leene's Bell and the Telepod
+pads, both answers to every prompt, the gate with and without the pendant, the
+status menu, the sound button, a run on the built-in art via `?noassets=1`, and a
+restart from the ending checking that gold, silver, flags and items all reset.
+
+`battle.mjs` drives the ATB battle through its own menus: Attack, Tech, Item and
+Run, backing out of a submenu, the not-enough-MP guard, and all three outcomes —
+including losing, which a normal playthrough never sees because the party wins
+comfortably.
+
+All three fail on a page error, a stall, or a step that never reaches the state
+it expects, and each prints what it actually exercised. They read `window.__CT` /
+`__CTDLG` / `__CTDBG`, the debug handles `js/game.js` already exposes; shared
+plumbing lives in `tools/testkit.mjs`.
 
 ## Using your own art
 
