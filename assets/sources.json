@@ -1,0 +1,255 @@
+{
+  "version": 1,
+  "_comment": [
+    "Upstream sprite sources for tools/sprite_pipeline.py.",
+    "Every pack must declare an SPDX license id from allowed_licenses, plus an",
+    "author, a license URL and a homepage. Sprites extracted from a commercial",
+    "release are not redistributable and must not be listed here.",
+    "Slice maps use [col, row] cell coordinates into the source sheet."
+  ],
+  "allowed_licenses": [
+    "CC0-1.0",
+    "CC-BY-3.0",
+    "CC-BY-4.0",
+    "CC-BY-SA-3.0",
+    "CC-BY-SA-4.0",
+    "OGA-BY-3.0",
+    "MIT",
+    "Unlicense"
+  ],
+  "packs": [
+    {
+      "id": "ninja-adventure",
+      "title": "Superpowers Ninja Adventure Asset Pack",
+      "author": "Pixel-boy (Sparklin Labs)",
+      "license": "CC0-1.0",
+      "license_url": "https://github.com/sparklinlabs/superpowers-asset-packs/blob/master/LICENSE.txt",
+      "homepage": "https://github.com/sparklinlabs/superpowers-asset-packs/tree/master/ninja-adventure",
+      "notes": "16x16 top-down JRPG pack. Character sheets are 4 columns (down/up/left/right) x 7 rows; rows 0-3 are the walk cycle, which lines up with the game's own frame convention. Tiles come from the shared background-elements tileset.",
+      "discover": {
+        "repo": "sparklinlabs/superpowers-asset-packs",
+        "ref": "master",
+        "root": "ninja-adventure"
+      },
+      "sources": {
+        "char5": {
+          "url": "https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/ninja-adventure/characters/5.png",
+          "sha256": "d2d4257e5d54618efe1bc1be32d480ca8356d7981de59af4e216e20de2b61c4e"
+        },
+        "char6": {
+          "url": "https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/ninja-adventure/characters/6.png",
+          "sha256": "173655715e319cf2383c189673d3c198bb5c840155120015ce4501ab5d2fdc77"
+        },
+        "char9": {
+          "url": "https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/ninja-adventure/characters/9.png",
+          "sha256": "79ee75f1cf2e11f96b94d4bf102013b86ac46b5fd9ec4243e408954ade4aa2c3"
+        },
+        "char11": {
+          "url": "https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/ninja-adventure/characters/11.png",
+          "sha256": "44a3bf31d01e563fbf3800be8eb98c4955157cdb0ada767854becb504957d196"
+        },
+        "char12": {
+          "url": "https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/ninja-adventure/characters/12.png",
+          "sha256": "a2acf1c4866777dedbef9d8fc07971c4f6a556fa73f5192aee9b86e385c0eae4"
+        },
+        "char14": {
+          "url": "https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/ninja-adventure/characters/14.png",
+          "sha256": "10136e78185754a94b404d7d68d05af37217f0edf7a96627a361bdc27bcb0128"
+        },
+        "char16": {
+          "url": "https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/ninja-adventure/characters/16.png",
+          "sha256": "50151d435a719149f6ad53369670ed8068c6dda97d96e6a0de5cf0cf6aa17095"
+        },
+        "char17": {
+          "url": "https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/ninja-adventure/characters/17.png",
+          "sha256": "befe5e851dc1f9e74f46042e270d00775632a13d9877c11625d9bfdbe971c74f"
+        },
+        "char18": {
+          "url": "https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/ninja-adventure/characters/18.png",
+          "sha256": "1212d624d20ef3142bd9caf0cf1881dac1e5c3c9f29c5ae9d8ca5989e294d129"
+        },
+        "char24": {
+          "url": "https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/ninja-adventure/characters/24.png",
+          "sha256": "26a0903467121a133ca48efe345d71ab625824a77e68374702a4ff47abf9fd73"
+        },
+        "char25": {
+          "url": "https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/ninja-adventure/characters/25.png",
+          "sha256": "1a7278dc6b0c078ec34eb49f731c78511a38ef18abd788ce9b1f19781eb65a3b"
+        },
+        "tileset": {
+          "url": "https://raw.githubusercontent.com/sparklinlabs/superpowers-asset-packs/master/ninja-adventure/background-elements/tileset.png",
+          "sha256": "aa2708aa07cabda86f02d65bf2095a6b53b96fdfd43cf191931689f517f284a4"
+        }
+      },
+      "chars": {
+        "crono": {
+          "from": "char6",
+          "cell": [16, 16],
+          "frames": 4,
+          "step": "row",
+          "dirs": {
+            "down": [0, 0],
+            "up": [1, 0],
+            "left": [2, 0],
+            "right": [3, 0]
+          }
+        },
+        "marle": {
+          "from": "char17",
+          "cell": [16, 16],
+          "frames": 4,
+          "step": "row",
+          "dirs": {
+            "down": [0, 0],
+            "up": [1, 0],
+            "left": [2, 0],
+            "right": [3, 0]
+          }
+        },
+        "lucca": {
+          "from": "char24",
+          "cell": [16, 16],
+          "frames": 4,
+          "step": "row",
+          "dirs": {
+            "down": [0, 0],
+            "up": [1, 0],
+            "left": [2, 0],
+            "right": [3, 0]
+          }
+        },
+        "mom": {
+          "from": "char5",
+          "cell": [16, 16],
+          "frames": 4,
+          "step": "row",
+          "dirs": {
+            "down": [0, 0],
+            "up": [1, 0],
+            "left": [2, 0],
+            "right": [3, 0]
+          }
+        },
+        "taban": {
+          "from": "char9",
+          "cell": [16, 16],
+          "frames": 4,
+          "step": "row",
+          "dirs": {
+            "down": [0, 0],
+            "up": [1, 0],
+            "left": [2, 0],
+            "right": [3, 0]
+          }
+        },
+        "villager1": {
+          "from": "char25",
+          "cell": [16, 16],
+          "frames": 4,
+          "step": "row",
+          "dirs": {
+            "down": [0, 0],
+            "up": [1, 0],
+            "left": [2, 0],
+            "right": [3, 0]
+          }
+        },
+        "villager2": {
+          "from": "char12",
+          "cell": [16, 16],
+          "frames": 4,
+          "step": "row",
+          "dirs": {
+            "down": [0, 0],
+            "up": [1, 0],
+            "left": [2, 0],
+            "right": [3, 0]
+          }
+        },
+        "villager3": {
+          "from": "char14",
+          "cell": [16, 16],
+          "frames": 4,
+          "step": "row",
+          "dirs": {
+            "down": [0, 0],
+            "up": [1, 0],
+            "left": [2, 0],
+            "right": [3, 0]
+          }
+        },
+        "kid": {
+          "from": "char16",
+          "cell": [16, 16],
+          "frames": 4,
+          "step": "row",
+          "dirs": {
+            "down": [0, 0],
+            "up": [1, 0],
+            "left": [2, 0],
+            "right": [3, 0]
+          }
+        },
+        "guard": {
+          "from": "char18",
+          "cell": [16, 16],
+          "frames": 4,
+          "step": "row",
+          "dirs": {
+            "down": [0, 0],
+            "up": [1, 0],
+            "left": [2, 0],
+            "right": [3, 0]
+          }
+        },
+        "cat": {
+          "from": "char11",
+          "cell": [16, 16],
+          "frames": 4,
+          "step": "row",
+          "dirs": {
+            "down": [0, 0],
+            "up": [1, 0],
+            "left": [2, 0],
+            "right": [3, 0]
+          }
+        }
+      },
+      "tiles": {
+        ".": {
+          "from": "tileset",
+          "at": [14, 16]
+        },
+        ",": {
+          "from": "tileset",
+          "at": [13, 16]
+        },
+        "=": {
+          "from": "tileset",
+          "at": [19, 14]
+        },
+        "P": {
+          "from": "tileset",
+          "at": [24, 12]
+        },
+        "~": {
+          "from": "tileset",
+          "at": [20, 8]
+        },
+        "T": {
+          "from": "tileset",
+          "at": [1, 10]
+        },
+        "C": {
+          "from": "tileset",
+          "at": [14, 10]
+        },
+        "W": {
+          "from": "tileset",
+          "at": [20, 1]
+        }
+      },
+      "props": {}
+    }
+  ]
+}

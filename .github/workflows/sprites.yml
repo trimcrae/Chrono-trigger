@@ -1,0 +1,114 @@
+name: Sprite assets
+
+# The dev container has no general outbound internet access, so asset fetching
+# happens here: an Actions runner downloads the upstream sheets listed in
+# assets/sources.json, slices them into the sheet layout js/assets.js expects,
+# and commits the result back to the branch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'discover (list upstream files) or build (fetch + slice)'
+        type: choice
+        options: [build, discover]
+        default: build
+      pack:
+        description: 'Limit to one pack id (blank = all)'
+        type: string
+        default: ''
+      measure:
+        description: 'discover: download images to report their dimensions'
+        type: boolean
+        default: false
+      filter:
+        description: 'discover: only paths containing this substring'
+        type: string
+        default: ''
+      commit:
+        description: 'build: commit generated assets back to the branch'
+        type: boolean
+        default: true
+  push:
+    paths:
+      - 'assets/sources.json'
+      - 'tools/sprite_pipeline.py'
+      - '.github/workflows/sprites.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sprites-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sprites:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow
+        run: python -m pip install --quiet 'pillow>=10,<12'
+
+      # Push runs do both: the listing lands in the job log (and the artifact),
+      # which is how the slice maps in sources.json get written in the first place.
+      - name: Discover upstream pack contents
+        if: github.event_name == 'push' || inputs.mode == 'discover'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python tools/sprite_pipeline.py discover \
+            ${{ inputs.pack && format('--pack {0}', inputs.pack) || '' }} \
+            ${{ inputs.filter && format('--filter {0}', inputs.filter) || '' }} \
+            ${{ (github.event_name == 'push' || inputs.measure) && '--measure' || '' }} \
+            --out discovery.json
+
+      - name: Build sprite override assets
+        if: github.event_name == 'push' || inputs.mode != 'discover'
+        run: |
+          python tools/sprite_pipeline.py build \
+            ${{ inputs.pack && format('--pack {0}', inputs.pack) || '' }} \
+            --pin
+          python tools/sprite_pipeline.py verify
+
+      - name: Summarise
+        if: github.event_name == 'push' || inputs.mode != 'discover'
+        run: |
+          {
+            echo '## Generated sprite sheets'
+            echo
+            echo '```'
+            ls -la assets assets/packs 2>/dev/null || true
+            cat assets/manifest.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sprite-assets-${{ github.run_id }}
+          path: |
+            assets/packs/
+            assets/manifest.json
+            assets/CREDITS.md
+            discovery.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Commit generated assets
+        if: github.event_name == 'push' || (inputs.mode != 'discover' && inputs.commit)
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A assets
+          if git diff --cached --quiet; then
+            echo 'no sprite changes to commit'
+            exit 0
+          fi
+          git commit -m 'Regenerate sprite override assets from sources.json'
+          git push origin HEAD:${{ github.ref_name }}

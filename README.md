@@ -64,6 +64,15 @@ can replace one thing at a time. `assets/README.md` documents the layout, and
 `assets/templates/` contains dumps of the built-in art at the exact cell sizes.
 Load the page with `?noassets=1` to force the built-in art and compare.
 
+Sheets can also be assembled from an upstream asset pack rather than drawn by
+hand. `assets/sources.json` lists the packs and the cells to cut from them;
+`tools/sprite_pipeline.py` fetches, slices and wires them into the manifest, and
+`.github/workflows/sprites.yml` runs it on an Actions runner whenever the sources
+change. The pack currently wired up is Pixel-boy's CC0 *Ninja Adventure* set —
+see `assets/CREDITS.md`. A pack must declare an open license to build at all;
+*Chrono Trigger*'s own sprites belong to Square Enix and are not redistributable,
+so they are not fetched here.
+
 ## Credits
 
 *Chrono Trigger* is a trademark of Square Enix. This is a fan-made, non-commercial tribute built
