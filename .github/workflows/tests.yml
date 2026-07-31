@@ -41,19 +41,23 @@ jobs:
             exit 1
           fi
 
-      - name: Serve the game
+      # The server has to start and stop inside the step that uses it. Left
+      # backgrounded in a step of its own the runner waits on the child and the
+      # step never finishes.
+      - name: Play the chapter and sweep the edge cases
         run: |
-          python -m http.server 8125 --directory . >/tmp/serve.log 2>&1 &
+          set -euo pipefail
+          nohup python -m http.server 8125 --directory . >/tmp/serve.log 2>&1 </dev/null &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
           for i in $(seq 1 30); do
             curl -sf -o /dev/null http://localhost:8125/index.html && break
             sleep 1
           done
+          curl -sf -o /dev/null http://localhost:8125/index.html || { cat /tmp/serve.log; exit 1; }
 
-      - name: Playthrough
-        run: node tools/playthrough.mjs http://localhost:8125 "$RUNNER_TEMP/play"
-
-      - name: Edge cases
-        run: node tools/edgecases.mjs http://localhost:8125
+          node tools/playthrough.mjs http://localhost:8125 "$RUNNER_TEMP/play"
+          node tools/edgecases.mjs http://localhost:8125
 
       - name: Upload screenshots
         if: always()
