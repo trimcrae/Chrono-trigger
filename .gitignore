@@ -1,3 +1,5 @@
 .sprite-cache/
 discovery.json
 node_modules/
+__pycache__/
+*.pyc
