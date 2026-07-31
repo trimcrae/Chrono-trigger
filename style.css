@@ -1,0 +1,167 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: #05070f;
+  color: #dbe6ff;
+  font-family: Verdana, "DejaVu Sans", "Segoe UI", system-ui, sans-serif;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+#screen {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(120% 90% at 50% 0%, #101a3c 0%, #05070f 70%);
+}
+
+#game {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: none;
+}
+
+/* ---------- top bar ---------- */
+#topbar {
+  position: absolute;
+  top: 6px; right: 8px;
+  display: flex;
+  gap: 6px;
+  z-index: 5;
+}
+#topbar button {
+  width: 34px; height: 30px;
+  border: 1px solid rgba(160,200,255,.45);
+  border-radius: 6px;
+  background: rgba(8,18,52,.72);
+  color: #cfe2ff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+#topbar button:active { background: rgba(40,80,180,.8); }
+#topbar button.off { color: #ff8080; border-color: rgba(255,120,120,.5); }
+
+/* ---------- touch controls ---------- */
+#controls {
+  display: none;
+  flex: 0 0 auto;
+  height: clamp(170px, 36vh, 300px);
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 max(14px, env(safe-area-inset-left)) 8px max(14px, env(safe-area-inset-right));
+  background: linear-gradient(180deg, #070b1c 0%, #05070f 100%);
+  z-index: 10;
+}
+body.touch #controls { display: flex; }
+
+#dpad {
+  position: relative;
+  width: min(42vw, 175px);
+  aspect-ratio: 1;
+  touch-action: none;
+}
+#dpad .dp-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 40%, #24345f 0%, #131c38 60%, #0d1428 100%);
+  border: 2px solid rgba(140,180,255,.35);
+  box-shadow: inset 0 -6px 16px rgba(0,0,0,.6), 0 3px 10px rgba(0,0,0,.5);
+}
+#dpad::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 26%; height: 26%;
+  transform: translate(-50%,-50%);
+  border-radius: 50%;
+  background: rgba(180,215,255,.18);
+}
+#dpad .arw {
+  position: absolute;
+  color: #a9c6ff;
+  font-size: clamp(15px, 4.6vw, 24px);
+  opacity: .75;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+#dpad .arw.up    { left: 50%; top: 14%; }
+#dpad .arw.down  { left: 50%; top: 86%; }
+#dpad .arw.left  { left: 14%; top: 50%; }
+#dpad .arw.right { left: 86%; top: 50%; }
+#dpad[data-dir*="u"] .arw.up,
+#dpad[data-dir*="d"] .arw.down,
+#dpad[data-dir*="l"] .arw.left,
+#dpad[data-dir*="r"] .arw.right { color: #ffe070; opacity: 1; }
+
+#btns {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+.ab { display: flex; align-items: center; gap: 14px; }
+.round {
+  width: clamp(58px, 17vw, 84px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.35);
+  font-size: clamp(17px, 4.6vw, 24px);
+  font-weight: bold;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: inset 0 -6px 14px rgba(0,0,0,.45), 0 3px 10px rgba(0,0,0,.5);
+}
+.round.a { background: linear-gradient(180deg, #3f7de0, #1b3f96); transform: translateY(10px); }
+.round.b { background: linear-gradient(180deg, #d2564f, #8d2320); }
+.round.down, #topbar button.down { filter: brightness(1.45); transform: scale(.94) translateY(6px); }
+.small {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(160,200,255,.4);
+  background: rgba(16,28,68,.9);
+  color: #cfe2ff;
+  font-size: 12px;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+.small.down { filter: brightness(1.5); }
+
+/* Landscape / short screens: float the controls over the game so it stays big */
+@media (orientation: landscape) and (max-height: 560px) {
+  body.touch #controls {
+    position: fixed;
+    inset: auto 0 0 0;
+    height: 100dvh;
+    background: none;
+    pointer-events: none;
+    padding-bottom: 10px;
+    align-items: flex-end;
+  }
+  #dpad, #btns { pointer-events: auto; }
+  #dpad { width: min(30vh, 150px); opacity: .88; }
+  #btns { opacity: .92; }
+}
+
+@media (min-width: 900px) and (hover: hover) {
+  #screen { padding: 12px; }
+}
