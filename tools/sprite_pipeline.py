@@ -365,6 +365,18 @@ def _draw_authored_tiles(pack: dict) -> dict:
     return images
 
 
+def _draw_authored_props(pack: dict) -> dict:
+    """Render props from a module in this repository; sizes are the engine's."""
+    import importlib
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    module = importlib.import_module(pack["props_module"])
+    images = module.prop_images()
+    for name, img in images.items():
+        log(f"  drew prop {name}: {img.width}x{img.height}")
+    return images
+
+
 def cmd_build(args: argparse.Namespace) -> int:
     from PIL import Image  # noqa: PLC0415
 
@@ -394,6 +406,8 @@ def cmd_build(args: argparse.Namespace) -> int:
                 chars.update(_draw_authored(pack))
             if pack.get("tiles_module"):
                 tiles.update(_draw_authored_tiles(pack))
+            if pack.get("props_module"):
+                props.update(_draw_authored_props(pack))
             credits.append(_credit(pack))
             continue
         images = _open_sources(pack, cache)

@@ -32,8 +32,9 @@
       "license": "Apache-2.0",
       "license_url": "https://github.com/trimcrae/Chrono-trigger/blob/main/LICENSE",
       "homepage": "https://github.com/trimcrae/Chrono-trigger",
-      "notes": "Original 16x24 field sprites and 16x16 map tiles written by hand in tools/art/, drawn to sit in the same visual register as SNES-era overworld art. Not traced from, or derived from, any commercial release.",
-      "tiles_module": "art.tiles"
+      "notes": "Original art written by hand in tools/art/: 16x24 field sprites, 16x16 map tiles and the oversized props. Drawn to sit in the same visual register as SNES-era overworld art; not traced from, or derived from, any commercial release.",
+      "tiles_module": "art.tiles",
+      "props_module": "art.props"
     }
   ]
 }

@@ -97,7 +97,8 @@ helmet and glasses), so the whole cast stays consistent. Tiles come in two kinds
 ground that repeats across a whole screen — grass, earth, pavement, water,
 carpet — is textured from a fixed seed, because hand-placed noise reads as a
 stamped motif the moment it tiles; everything with a shape is written out as a
-grid.
+grid. The oversized props — Gato, Leene's Bell, the gate, a balloon — live in
+`tools/art/props.py`.
 
 ```sh
 python3 tools/sprite_pipeline.py build    # redraw assets/packs/ and update the manifest

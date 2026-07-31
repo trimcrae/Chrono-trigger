@@ -162,10 +162,15 @@ function updatePath(e, dt) {
     if (r) r();
     return true;
   }
-  if (Math.abs(dx) > 1) {
+  // These have to use the same threshold the arrival test above uses. With a
+  // larger one, a residual that is too small to step but too large to count as
+  // arrival satisfies neither, the path never resolves, and any cutscene
+  // awaiting it hangs with input still locked — which softlocked the walk into
+  // the gate whenever the player stepped onto the pad even slightly off-grid.
+  if (Math.abs(dx) > sp) {
     e.dir = dx > 0 ? 'right' : 'left';
     e.x += Math.sign(dx) * Math.min(sp, Math.abs(dx));
-  } else if (Math.abs(dy) > 1) {
+  } else if (Math.abs(dy) > sp) {
     e.dir = dy > 0 ? 'down' : 'up';
     e.y += Math.sign(dy) * Math.min(sp, Math.abs(dy));
   }

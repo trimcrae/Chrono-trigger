@@ -154,6 +154,27 @@ for (const id of maps) {
 }
 
 /* ------------------------------------------------------------------ */
+/* 1b. scripted walks resolve from any starting offset                 */
+/* ------------------------------------------------------------------ */
+// Cutscenes await these paths. A residual too small to step but too large to
+// count as arrival used to satisfy neither test, so the path never resolved and
+// the scene hung with input locked — the walk into the gate could softlock.
+await freshStart();
+for (const [ox, oy] of [[1, 1], [1, 0], [0, 1], [3, 3], [0.6, 0.6], [7, 2]]) {
+  const r = await page.evaluate(async ([ox, oy]) => {
+    const pl = window.__CT.player;
+    pl.path = null;
+    pl.x = 80 + ox; pl.y = 88 + oy; pl.pathSpeed = 40;
+    let done = false;
+    pl.path = { x: 80, y: 88, res: () => { done = true; } };
+    await new Promise(res => setTimeout(res, 1500));
+    return { done, x: Math.round(pl.x), y: Math.round(pl.y) };
+  }, [ox, oy]);
+  if (!r.done) problems.push(`PATH: a scripted walk from +${ox},${oy} never arrived (stopped at ${r.x},${r.y})`);
+}
+notes.push('scripted paths resolve from off-grid offsets');
+
+/* ------------------------------------------------------------------ */
 /* 2. the status menu opens and closes                                 */
 /* ------------------------------------------------------------------ */
 await freshStart();

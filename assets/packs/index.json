@@ -1,7 +1,12 @@
 {
   "characters": "packs/characters.png",
   "tiles": "packs/tiles.png",
-  "props": {},
+  "props": {
+    "gato": "packs/prop-gato.png",
+    "bell": "packs/prop-bell.png",
+    "balloon": "packs/prop-balloon.png",
+    "gate": "packs/prop-gate.png"
+  },
   "characterOrder": [
     "crono",
     "marle",
